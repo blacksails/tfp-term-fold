@@ -493,10 +493,7 @@ Proof.
   rewrite (about_fold_left_and_append
              fold_left_v0
              fold_left_v0_fits_the_specification_of_fold_left
-             T 
-             (list T)
-             (x :: nil)
-             (fun (n : T) (ns : list T) => n :: ns)
+             T
              xs'
              x
              nil
