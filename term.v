@@ -591,7 +591,7 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem plus_satisfies_the_specification_of_addition :
+Theorem plus_fits_the_specification_of_addition :
   specification_of_addition plus.
 Proof.
   unfold specification_of_addition; split.
@@ -616,10 +616,11 @@ Proof.
   induction ns as [ | n' ns' IHns']; intro n.
     rewrite ->2 H_fold_left_nil.
     (* Rewrite add to plus so that we can use the coq lib's lemmas about plus *)
-    rewrite (there_is_only_one_addition add
-                                        plus
-                                        S_add
-                                        plus_satisfies_the_specification_of_addition).
+    rewrite (there_is_only_one_addition 
+               add
+               plus
+               S_add
+               plus_fits_the_specification_of_addition).
     ring.
   rewrite H_fold_left_cons.
   rewrite <- IHns'.
@@ -630,7 +631,7 @@ Proof.
                  add
                  plus
                  S_add
-                 plus_satisfies_the_specification_of_addition).
+                 plus_fits_the_specification_of_addition).
   ring.
 Qed.
 
@@ -647,18 +648,25 @@ Proof.
   intro ns.  
   
   induction ns as [ | n ns' IHns'].
-  
-  rewrite -> unfold_fold_right_v0_nil.
-  rewrite -> unfold_fold_left_v0_nil.
-  reflexivity.
+    (* NIL CASE *)
+    rewrite unfold_fold_right_v0_nil.
+    rewrite unfold_fold_left_v0_nil.
+    reflexivity.
+  (* CONS CASE *)
+  (* left hand side *)
+  rewrite unfold_fold_right_v0_cons.
+  rewrite IHns'.
+  (* right hand side *)
+  rewrite unfold_fold_left_v0_cons.
+  rewrite plus_0_r.
 
-  rewrite -> unfold_fold_right_v0_cons.
-
-  rewrite -> unfold_fold_left_v0_cons.
-  rewrite -> plus_0_r.
-
-  rewrite -> IHns'.
-  apply about_fold_left_v0_and_plus.
+  apply (about_addition_and_fold_left
+           fold_left_v0
+           plus
+           fold_left_v0_fits_the_specification_of_fold_left
+           plus_fits_the_specification_of_addition
+           n
+           ns').
 Qed.
 
 Proposition fold_right_and_left_on_assoc_and_comm_cons_same_result :
