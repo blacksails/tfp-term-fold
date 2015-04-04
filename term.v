@@ -559,29 +559,80 @@ Proof.
   apply fold_left_v0_fits_the_specification_of_fold_left.
 Qed.
 
-(* show that if the cons case is a function that is associative and
+(* 
+  show that if the cons case is a function that is associative and
   commutative, applying fold_left and applying fold_right to a nil case,
   this cons case, and a list give the same result.  Example
   (remembering that + is the infix notation for the function plus):
 *)
 
-Proposition about_fold_left_v0_and_plus :
-  forall (n : nat) (ns : list nat),
-    n + fold_left_v0 nat nat 0 plus ns =
-    fold_left_v0 nat nat n plus ns.
+Definition specification_of_addition (add : nat -> nat -> nat) :=
+  (forall j : nat,
+    add O j = j)
+  /\
+  (forall i' j : nat,
+    add (S i') j = S (add i' j)).
+
+Theorem there_is_only_one_addition :
+  forall (p1 p2 : nat -> nat -> nat),
+    specification_of_addition p1 ->
+    specification_of_addition p2 ->
+    forall (x y : nat),
+      p1 x y = p2 x y.
 Proof.
-
-  intros n ns.
-  revert n.
-
-  induction ns as [ | x xs IHxs ]; intro n.
-
-  rewrite ->2 unfold_fold_left_v0_nil.
-  rewrite -> plus_0_r.
+  intros p1 p2 [H_p1_bc H_p1_ic] [H_p2_bc H_p2_ic].
+  intros x y.
+  induction x as [ | x' IHx'].
+    rewrite H_p2_bc.
+    apply H_p1_bc.
+  rewrite H_p1_ic.
+  rewrite IHx'.
+  rewrite H_p2_ic.
   reflexivity.
+Qed.
 
-  rewrite -> unfold_fold_left_v0_cons.
-Admitted.
+Theorem plus_satisfies_the_specification_of_addition :
+  specification_of_addition plus.
+Proof.
+  unfold specification_of_addition; split.
+    apply plus_0_l.
+  apply plus_Sn_m.
+Qed.
+
+Proposition about_addition_and_fold_left :
+  forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2)
+         (add : nat -> nat -> nat),
+    specification_of_fold_left fold_left ->
+    specification_of_addition add ->
+    forall (n : nat)
+           (ns : list nat),
+      add n (fold_left nat nat 0 add ns) = fold_left nat nat n add ns.
+Proof.
+  intros fold_left add 
+         [H_fold_left_nil H_fold_left_cons] S_add.
+  intros n ns.
+ 
+  revert n. 
+  induction ns as [ | n' ns' IHns']; intro n.
+    rewrite ->2 H_fold_left_nil.
+    (* Rewrite add to plus so that we can use the coq lib's lemmas about plus *)
+    rewrite (there_is_only_one_addition add
+                                        plus
+                                        S_add
+                                        plus_satisfies_the_specification_of_addition).
+    ring.
+  rewrite H_fold_left_cons.
+  rewrite <- IHns'.
+  rewrite H_fold_left_cons.
+  rewrite <- (IHns' (add n' n)).
+  (* Rewrite add to plus so that we can use the coq lib's lemmas about plus *)
+  rewrite ->5 (there_is_only_one_addition 
+                 add
+                 plus
+                 S_add
+                 plus_satisfies_the_specification_of_addition).
+  ring.
+Qed.
 
 Proposition same_old_same_old :
   (forall n m p : nat,
