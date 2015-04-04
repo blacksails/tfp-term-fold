@@ -669,6 +669,28 @@ Proof.
            ns').
 Qed.
 
+(* Wrote this too many times :o) *)
+Definition fold_type :=
+  forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2.
+
+Proposition fold_right_and_left_on_assoc_and_comm_cons_same_result_aux :
+  forall (fold_left : fold_type),
+    specification_of_fold_left fold_left ->
+    forall (T : Type)
+           (func : T -> T -> T)
+           (n : T)
+           (ns : list T),
+      func n (fold_left T T n func ns) = fold_left T T (func n n) func ns.
+Proof.
+  intros fold_left [H_fold_left_nil H_fold_left_cons].
+  intros T func n ns.
+
+  induction ns as [ | n' ns' IHns'].
+    rewrite ->2 H_fold_left_nil.
+    reflexivity.
+  rewrite H_fold_left_cons.
+Abort.
+
 Proposition fold_right_and_left_on_assoc_and_comm_cons_same_result :
   forall (T : Type) (func : T -> T -> T),
     (forall n m p : T,
@@ -678,7 +700,16 @@ Proposition fold_right_and_left_on_assoc_and_comm_cons_same_result :
     forall (n : T) (ns : list T),
       fold_right_v0 T T n func ns = fold_left_v0 T T n func ns.
 Proof.
+  intros T func func_assoc func_comm n ns.
+  induction ns as [ | n ns' IHns'].
+    rewrite unfold_fold_right_v0_nil.
+    rewrite unfold_fold_left_v0_nil.
+    reflexivity.
+  rewrite unfold_fold_right_v0_cons.
+  rewrite IHns'.
+  rewrite unfold_fold_left_v0_cons.
 Abort.
+
 
 (* compare fold_right and fold_left with primitive iteration and primitive
   recursion over lists *)
