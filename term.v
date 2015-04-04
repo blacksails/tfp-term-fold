@@ -432,9 +432,7 @@ Qed.
 Proposition about_fold_left_and_append :
   forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
     specification_of_fold_left fold_left ->
-      forall (T1 T2 : Type)
-             (nil_case : T2)
-             (cons_case : T1 -> T2 -> T2)
+      forall (T1 : Type)
              (vs : list T1)
              (x : T1)
              (xs : list T1)
@@ -454,7 +452,7 @@ Proposition about_fold_left_and_append :
                (x :: xs).
 Proof.
   intros fold_left [H_fold_left_nil H_fold_left_cons].
-  intros T1 T2 nil_case cons_case vs x xs.
+  intros T1 vs x xs.
   intros append S_append;
   assert (S_append_tmp := S_append);
   destruct S_append_tmp as [H_append_bc H_append_ic].
@@ -526,13 +524,12 @@ Proposition fold_left_v1_fits_the_specification_of_fold_left :
 Proof.
   unfold specification_of_fold_left, fold_left_v1.
   split.
-
-  apply unfold_fold_right_v0_nil.
-
+    (* NIL CASE *)
+    apply unfold_fold_right_v0_nil.
+  (* CONS CASE *)
   intros T1 T2 nil_case cons_case v vs'.
-  
-  rewrite -> unfold_fold_right_v0_cons.
-  reflexivity.    
+  rewrite unfold_fold_right_v0_cons.
+  reflexivity.
 Qed.
 
 (* define fold_right in term of fold_left, and prove that your definition
@@ -553,7 +550,15 @@ Proposition fold_right_v1_fits_the_specification_of_fold_right :
     specification_of_fold_right fold_right_v1.
 Proof.
   unfold fold_right_v1.
+  (* 
+    We have already shown that the goal holds if the implementation of fold_left
+    that we use fits the specification of fold_left. Let's use that knowledge!
+  *)
   apply fold_right_from_fold_left.
+  (* 
+    Now we just have to prove that fold_left_v0 fits the specification which
+    we have already proven. 
+  *)
   apply fold_left_v0_fits_the_specification_of_fold_left.
 Qed.
 
