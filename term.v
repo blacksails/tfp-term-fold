@@ -236,75 +236,7 @@ Qed.
 (* propose an implementation of fold_right (resp. of fold_left)
 that satisfies the specification of fold_right (resp. of fold_left). *)
 
-Proposition fold_right_from_fold_left_aux :
-  forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
-    specification_of_fold_left fold_left ->
-    forall (T1 T2 : Type)
-           (nil_case : T2)
-           (cons_case : T1 -> T2 -> T2)
-           (vs : list T1)
-           (k : T2 -> T2),
-      fold_left T1
-                (T2 -> T2)
-                k
-                (fun x h a => h (cons_case x a))
-                vs
-                nil_case =
-      k (fold_left T1
-                   (T2 -> T2)
-                   (fun a => a)
-                   (fun x h a => h (cons_case x a))
-                   vs
-                   nil_case).
-Proof.
-  intros fold_left [H_fold_left_nil H_fold_left_cons].
-  intros T1 T2 nil_case cons_case vs.
-
-  induction vs as [ | v vs' IHvs' ]; intro k.
-    (* NIL CASE *)
-    rewrite ->2 H_fold_left_nil.
-    reflexivity.
-  (* CONS CASE *)
-  (* left hand side *)
-  rewrite H_fold_left_cons.
-  rewrite IHvs'.
-  (* right hand side *)
-  rewrite H_fold_left_cons.
-  rewrite (IHvs' (fun a : T2 => cons_case v a)).
-  reflexivity.    
-Qed.
-
-Proposition fold_right_from_fold_left :
-  forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
-    specification_of_fold_left fold_left ->
-    specification_of_fold_right (fun T1 T2 nil_case cons_case vs =>
-                                   fold_left T1
-                                             (T2 -> T2)
-                                             (fun a => a)
-                                             (fun x h a => h (cons_case x a))
-                                             vs
-                                             nil_case).
-Proof.
-  intros fold_left S_fold_left_tmp.
-  assert (S_fold_left := S_fold_left_tmp).
-  destruct S_fold_left_tmp as [H_fold_left_nil H_fold_left_cons].
-
-  unfold specification_of_fold_right; split.
-    (* NIL CASE *)
-    intros T1 T2 nil_case cons_case.
-    rewrite H_fold_left_nil.
-    reflexivity.
-  (* CONS CASE *)
-  intros T1 T2 nil_case cons_case v vs'.
-  rewrite H_fold_left_cons.
-  rewrite -> (fold_right_from_fold_left_aux
-                fold_left
-                S_fold_left
-                T1 T2
-                nil_case cons_case vs'
-                (fun a : T2 => cons_case v a)).
-  reflexivity.
-Qed.
+(* Moved further down the file *)
   
 (* show that applying [your implementation of] fold_right
   to nil and cons gives the identity function over lists
@@ -378,18 +310,18 @@ Qed.
     (3 :: 2 :: 1 :: nil)
  *)
 
-Definition unit_tests_for_reverse_nat (reverse : forall T, list T -> list T) :=
-  (beq_nat_list (reverse nat nil)
+Definition unit_tests_for_append_nat (append : forall T, list T -> list T -> list T) :=
+  (beq_nat_list (append nat nil nil)
                   nil)
   &&
-  (beq_nat_list (reverse nat (1 :: nil))
-                  (1 :: nil))
+  (beq_nat_list (append nat (1 :: nil) nil)
+                (1 :: nil))
   &&
-  (beq_nat_list (reverse nat (1 :: 2 :: nil))
-                  (2 :: 1 :: nil))
+  (beq_nat_list (append nat nil (4 :: nil))
+                (4 :: nil))
   &&
-  (beq_nat_list (reverse nat (1 :: 2 :: 3 :: nil))
-                  (3 :: 2 :: 1 :: nil)).
+  (beq_nat_list (append nat (1 :: 2 :: nil) (3 :: 4 :: nil))
+                  (1 :: 2 :: 3 :: 4 :: nil)).
 
 Definition specification_of_append (append : forall T, list T -> list T -> list T) :=
   (forall (T : Type) (ys : list T),
@@ -398,18 +330,45 @@ Definition specification_of_append (append : forall T, list T -> list T -> list 
   (forall (T : Type) (x : T) (xs' ys : list T),
      append T (x :: xs') ys = x :: (append T xs' ys)).
 
-Definition specification_of_reverse (reverse : forall T, list T -> list T) :=
-  forall (T : Type) (append : forall T, list T -> list T -> list T),
-    specification_of_append append ->
-    (reverse T nil = nil)
-    /\
-    (forall (x : T) (xs' : list T),
-       reverse T (x :: xs') = append T (reverse T xs') (x :: nil)).
+Theorem there_is_only_one_append :
+  forall (f g : forall T, list T -> list T -> list T),
+    specification_of_append f ->
+    specification_of_append g ->
+    forall (T : Type) (xs ys : list T),
+      f T xs ys = g T xs ys.
+Proof.
+  intros f g [Sf_bc Sf_ic] [Sg_bc Sg_ic].
+  intros T xs.
 
-Definition reverse_v0 (T : Type) (xs : list T) :=
-  fold_left_v0 T (list T) nil (fun n ns => n :: ns) xs.
+  induction xs as [ | x xs' IHxs' ]; intro ys.
 
-Compute unit_tests_for_reverse_nat reverse_v0.
+  rewrite -> Sg_bc.
+  apply Sf_bc.
+
+  rewrite -> Sf_ic.
+  rewrite -> IHxs'.
+  rewrite -> Sg_ic.
+  reflexivity.
+Qed.
+
+Definition append_v0 (T : Type) (xs ys : list T) :=
+  fold_right_v0 T (list T) ys (fun n ns => n :: ns) xs.
+
+Compute unit_tests_for_append_nat append_v0.
+
+Proposition append_v0_fits_the_specification_of_append :
+  specification_of_append append_v0.
+Proof.
+  unfold specification_of_append, append_v0.
+  split.
+
+  intros T ys.
+  apply unfold_fold_right_v0_nil.
+
+  intros T x xs' ys.
+  rewrite -> unfold_fold_right_v0_cons.
+  reflexivity.
+Qed.
 
 Theorem append_is_associative :
   forall (append : forall T, list T -> list T -> list T),
@@ -428,6 +387,59 @@ Proof.
   rewrite H_append_ic.
   reflexivity.
 Qed.
+
+Definition unit_tests_for_reverse_nat (reverse : forall T, list T -> list T) :=
+  (beq_nat_list (reverse nat nil)
+                  nil)
+  &&
+  (beq_nat_list (reverse nat (1 :: nil))
+                  (1 :: nil))
+  &&
+  (beq_nat_list (reverse nat (1 :: 2 :: nil))
+                  (2 :: 1 :: nil))
+  &&
+  (beq_nat_list (reverse nat (1 :: 2 :: 3 :: nil))
+                  (3 :: 2 :: 1 :: nil)).
+  
+Definition specification_of_reverse (reverse : forall T, list T -> list T) :=
+  (forall (T : Type),
+     reverse T nil = nil)
+  /\
+  (forall (T : Type) (x : T) (xs' : list T)
+          (append : forall T, list T -> list T -> list T),
+     specification_of_append append ->
+     reverse T (x :: xs') = append T (reverse T xs') (x :: nil)).
+
+Theorem there_is_only_one_reverse :
+  forall (f g : forall T, list T -> list T)
+         (append : forall T : Type, list T -> list T -> list T),
+    specification_of_reverse f ->
+    specification_of_reverse g ->
+    specification_of_append append ->
+    forall (T : Type) (xs : list T),
+      f T xs = g T xs.
+Proof.
+  intros f g append [Sf_bc Sf_ic] [Sg_bc Sg_ic].
+  intros S_append.
+  assert (S_append_tmp := S_append).
+  destruct S_append_tmp as [S_append_bc S_append_ic].    
+  intros T xs.
+
+  induction xs as [ | x xs' IHxs' ].
+
+  rewrite -> Sg_bc.
+  apply Sf_bc.
+
+  rewrite -> (Sf_ic T x xs' append S_append).
+  rewrite -> IHxs'.
+  rewrite -> (Sg_ic T x xs' append S_append).
+  reflexivity.
+Qed.
+
+Definition reverse_v0 (T : Type) (xs : list T) :=
+  fold_left_v0 T (list T) nil (fun n ns => n :: ns) xs.
+
+Compute unit_tests_for_reverse_nat reverse_v0.
 
 Proposition about_fold_left_and_append :
   forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
@@ -479,16 +491,14 @@ Qed.
 Proposition reverse_v0_fits_the_specification_of_reverse :
   specification_of_reverse reverse_v0.
 Proof.
-  unfold specification_of_reverse.
-  intros T append S_append;
-  assert (S_append_tmp := S_append);
-  destruct S_append_tmp as [H_append_bc H_append_ic].
-  
-  unfold reverse_v0; split.
-    (* NIL CASE *)
+  unfold specification_of_reverse, reverse_v0; split.  
+  (* NIL CASE *)
+    intros T.
     apply unfold_fold_left_v0_nil.
   (* CONS CASE *)
-  intros x xs'.
+  intros T x xs' append S_append.    
+  assert (S_append_tmp := S_append);
+  destruct S_append_tmp as [H_append_bc H_append_ic].    
   rewrite unfold_fold_left_v0_cons.
   rewrite (about_fold_left_and_append
              fold_left_v0
@@ -531,6 +541,76 @@ Qed.
 
 (* define fold_right in term of fold_left, and prove that your definition
   satisfies the specification of fold_right; *)
+
+Proposition fold_right_from_fold_left_aux :
+  forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
+    specification_of_fold_left fold_left ->
+    forall (T1 T2 : Type)
+           (nil_case : T2)
+           (cons_case : T1 -> T2 -> T2)
+           (vs : list T1)
+           (k : T2 -> T2),
+      fold_left T1
+                (T2 -> T2)
+                k
+                (fun x h a => h (cons_case x a))
+                vs
+                nil_case =
+      k (fold_left T1
+                   (T2 -> T2)
+                   (fun a => a)
+                   (fun x h a => h (cons_case x a))
+                   vs
+                   nil_case).
+Proof.
+  intros fold_left [H_fold_left_nil H_fold_left_cons].
+  intros T1 T2 nil_case cons_case vs.
+
+  induction vs as [ | v vs' IHvs' ]; intro k.
+    (* NIL CASE *)
+    rewrite ->2 H_fold_left_nil.
+    reflexivity.
+  (* CONS CASE *)
+  (* left hand side *)
+  rewrite H_fold_left_cons.
+  rewrite IHvs'.
+  (* right hand side *)
+  rewrite H_fold_left_cons.
+  rewrite (IHvs' (fun a : T2 => cons_case v a)).
+  reflexivity.    
+Qed.
+
+Proposition fold_right_from_fold_left :
+  forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
+    specification_of_fold_left fold_left ->
+    specification_of_fold_right (fun T1 T2 nil_case cons_case vs =>
+                                   fold_left T1
+                                             (T2 -> T2)
+                                             (fun a => a)
+                                             (fun x h a => h (cons_case x a))
+                                             vs
+                                             nil_case).
+Proof.
+  intros fold_left S_fold_left_tmp.
+  assert (S_fold_left := S_fold_left_tmp).
+  destruct S_fold_left_tmp as [H_fold_left_nil H_fold_left_cons].
+
+  unfold specification_of_fold_right; split.
+    (* NIL CASE *)
+    intros T1 T2 nil_case cons_case.
+    rewrite H_fold_left_nil.
+    reflexivity.
+  (* CONS CASE *)
+  intros T1 T2 nil_case cons_case v vs'.
+  rewrite H_fold_left_cons.
+  rewrite -> (fold_right_from_fold_left_aux
+                fold_left
+                S_fold_left
+                T1 T2
+                nil_case cons_case vs'
+                (fun a : T2 => cons_case v a)).
+  reflexivity.
+Qed.
 
 Definition fold_right_v1 (T1 T2 : Type)
                          (nil_case : T2)
@@ -751,10 +831,7 @@ Qed.
 
 Revisit the following procedures from last week and define them using fold-right_proper-list.
   * map1 in the section on Mapping procedures over proper lists;
-  * map1-append in the section on Mapping procedures over proper lists, continued;
-  * all-possible-environments in the section on Recursive programming: enumerating Boolean environments; and
-  * powerset in the section on Recursive programming: computing the powerset of a set.
-  * Make your definition go through the unit test of each of these procedures. *)
+*)
 
 Fixpoint odd (n : nat) :=
   match n with
@@ -799,7 +876,7 @@ Definition specification_of_map (map : forall T1 T2, (T1 -> T2) -> list T1 -> li
           (func : T1 -> T2),
      map T1 T2 func nil = nil)
   /\
-  (forall (T1 T2 : Type)
+  (forall (T1 T2 : Type) 
           (func : T1 -> T2)
           (v : T1)
           (vs' : list T1),
@@ -813,7 +890,7 @@ Theorem there_is_only_one_map :
            (func : T1 -> T2)
            (vs : list T1),
       m1 T1 T2 func vs = m2 T1 T2 func vs.
-Proof.
+Proof.  
   intros m1 m2 [H_m1_bc H_m1_ic] [H_m2_bc H_m2_ic].
   intros T1 T2 func vs.
   induction vs as [ | v vs' IHvs'].
@@ -825,6 +902,153 @@ Proof.
   reflexivity.
 Qed.
 
+Definition map_v0 (T1 T2 : Type) (func : T1 -> T2)(vs : list T1) :=
+  fold_right_v0 T1 (list T2) nil (fun x xs => func x :: xs) vs.
+
+Compute unit_tests_for_map map_v0.
+
+Proposition map_v0_fits_specification_of_map :
+  specification_of_map map_v0.
+Proof.
+  unfold specification_of_map, map_v0; split.
+
+  intros T1 T2 func.
+  apply unfold_fold_right_v0_nil.
+  
+  intros T1 T2 func v vs'.
+  rewrite -> unfold_fold_right_v0_cons.
+  reflexivity.
+Qed.
+
+(*  map1-append in the section on Mapping procedures over proper lists, continued; *)
+
+Definition unit_tests_for_map_append (candidate : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2) :=
+  (beq_nat_list (candidate nat nat (fun x => (x :: nil)) (1 :: 2 :: 3 :: nil))
+                (1 :: 2 :: 3 :: nil))
+  &&
+  (beq_nat_list (candidate nat nat (fun x => (x :: x :: nil)) (1 :: 2 :: 3 :: nil))
+                (1 :: 1 :: 2 :: 2 :: 3 :: 3 :: nil))
+  &&
+  (beq_nat_list (candidate nat nat (fun x => nil) (1 :: 2 :: 3 :: nil))
+                (nil))
+  &&
+  (beq_nat_list (candidate nat nat (fun x => (x :: nil)) nil)
+                (nil)).
+
+Definition specification_of_map_append (map : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2) :=
+  (forall (T1 T2 : Type)
+          (func : T1 -> list T2),
+          map T1 T2 func nil = nil)
+  /\
+  (forall (T1 T2 : Type)
+          (func : T1 -> list T2)
+          (v : T1)
+          (vs' : list T1)
+          (append : forall T : Type, list T -> list T -> list T),
+     specification_of_append append ->
+     map T1 T2 func (v :: vs') = append T2 (func v) (map T1 T2 func vs')).
+
+Theorem there_is_only_one_map_append :
+  forall (m1 m2 : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2)
+         (append : forall T : Type, list T -> list T -> list T),
+    specification_of_map_append m1 ->
+    specification_of_map_append m2 ->
+    specification_of_append append ->
+    forall (T1 T2 : Type)
+           (func : T1 -> (list T2))
+           (vs : list T1),
+      m1 T1 T2 func vs = m2 T1 T2 func vs.
+Proof.  
+  intros m1 m2 append
+         [H_m1_bc H_m1_ic] [H_m2_bc H_m2_ic].
+  intros S_append.
+  assert (S_append_tmp := S_append).
+  destruct S_append_tmp as [H_append_bc H_append_ic].
+  intros T1 T2 func vs.
+  
+  induction vs as [ | v vs' IHvs'].
+    rewrite H_m2_bc.
+    apply H_m1_bc.
+  rewrite -> (H_m1_ic T1 T2 func v vs' append S_append).
+  rewrite -> IHvs'.
+  rewrite -> (H_m2_ic T1 T2 func v vs' append S_append).
+  reflexivity.
+Qed.
+
+Definition map_append_v0 (T1 T2 : Type) (func : T1 -> list T2)(vs : list T1) :=
+  fold_right_v0 T1 (list T2) nil (fun x xs => append_v0 T2 (func x) xs) vs.
+
+Compute unit_tests_for_map_append map_append_v0.
+
+Proposition map_append_v0_fits_specification_of_map_append :
+  specification_of_map_append map_append_v0.
+Proof.
+  unfold specification_of_map_append, map_append_v0; split.
+
+  intros T1 T2 func.
+  apply unfold_fold_right_v0_nil.
+  
+  intros T1 T2 func v vs' append S_append.
+  rewrite -> unfold_fold_right_v0_cons.
+
+  rewrite -> (there_is_only_one_append append append_v0).
+  reflexivity.
+  apply S_append.
+  apply append_v0_fits_the_specification_of_append.
+Qed.
+
+ (* all-possible-environments in the section on Recursive programming: enumerating Boolean environments; and
+  * powerset in the section on Recursive programming: computing the powerset of a set.
+  * Make your definition go through the unit test of each of these procedures. *)
+                   
+Definition beq_environment (l1 l2 : list (nat * bool)) :=
+  beq_list (nat * bool) l1 l2 (
+             fun a b =>
+               match a with
+                 | (x1, y2) =>
+                   match y2 with
+                     | true =>
+                       match b with
+                         | (x2, y2) => y2 && (beq_nat x1 x2)
+                       end
+                     | false =>
+                       match b with
+                         | (x2, y2) => negb y2 && (beq_nat x1 x2)
+                       end
+                   end
+               end
+           ).
+
+Definition beq_environment_list (l1 l2 : list (list (nat * bool))) :=
+  beq_list (list (nat * bool)) l1 l2 beq_environment.
+
+Definition unit_tests_for_environments (candidate : list nat -> list (list (nat * bool))) :=
+  (beq_environment_list (candidate nil) nil)
+  &&
+  (beq_environment_list (candidate (1 :: nil)) (
+                      ((1, true)  :: nil) ::
+                      ((1, false) :: nil) ::
+                       nil))
+  &&
+  (beq_environment_list (candidate (1 :: 2 :: 3 :: nil)) (
+                      ((1, true)  :: (2, true)  :: (3, true)  :: nil) ::
+                      ((1, true)  :: (2, true)  :: (3, false) :: nil) ::
+                      ((1, true)  :: (2, false) :: (3, true)  :: nil) ::
+                      ((1, true)  :: (2, false) :: (3, false) :: nil) ::
+                      ((1, false) :: (2, true)  :: (3, true)  :: nil) ::
+                      ((1, false) :: (2, true)  :: (3, false) :: nil) ::
+                      ((1, false) :: (2, false) :: (3, true)  :: nil) ::
+                      ((1, false) :: (2, false) :: (3, false) :: nil) ::
+                      nil))
+.
+
+Definition specification_of_environments (environments : list nat -> list (list (nat * bool))) :
+  (environments nil = nil)
+  /\
+  (forall (x : nat) (xs : list nat),
+     environments (x :: xs) = (map (fun e => (x, true) :: e) (environments xs)) ++
+                              (map (fun e => (x, false) :: e) (environments xs)))
+.
+
 (* compare fold_right and fold_left with primitive iteration and primitive
   recursion over lists *)
-
