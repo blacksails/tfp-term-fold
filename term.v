@@ -997,58 +997,78 @@ Proof.
   apply append_v0_fits_the_specification_of_append.
 Qed.
 
- (* all-possible-environments in the section on Recursive programming: enumerating Boolean environments; and
-  * powerset in the section on Recursive programming: computing the powerset of a set.
-  * Make your definition go through the unit test of each of these procedures. *)
-                   
-Definition beq_environment (l1 l2 : list (nat * bool)) :=
-  beq_list (nat * bool) l1 l2 (
-             fun a b =>
-               match a with
-                 | (x1, y2) =>
-                   match y2 with
-                     | true =>
-                       match b with
-                         | (x2, y2) => y2 && (beq_nat x1 x2)
-                       end
-                     | false =>
-                       match b with
-                         | (x2, y2) => negb y2 && (beq_nat x1 x2)
-                       end
-                   end
-               end
-           ).
-
-Definition beq_environment_list (l1 l2 : list (list (nat * bool))) :=
-  beq_list (list (nat * bool)) l1 l2 beq_environment.
-
-Definition unit_tests_for_environments (candidate : list nat -> list (list (nat * bool))) :=
-  (beq_environment_list (candidate nil) nil)
-  &&
-  (beq_environment_list (candidate (1 :: nil)) (
-                      ((1, true)  :: nil) ::
-                      ((1, false) :: nil) ::
-                       nil))
-  &&
-  (beq_environment_list (candidate (1 :: 2 :: 3 :: nil)) (
-                      ((1, true)  :: (2, true)  :: (3, true)  :: nil) ::
-                      ((1, true)  :: (2, true)  :: (3, false) :: nil) ::
-                      ((1, true)  :: (2, false) :: (3, true)  :: nil) ::
-                      ((1, true)  :: (2, false) :: (3, false) :: nil) ::
-                      ((1, false) :: (2, true)  :: (3, true)  :: nil) ::
-                      ((1, false) :: (2, true)  :: (3, false) :: nil) ::
-                      ((1, false) :: (2, false) :: (3, true)  :: nil) ::
-                      ((1, false) :: (2, false) :: (3, false) :: nil) ::
-                      nil))
-.
-
-Definition specification_of_environments (environments : list nat -> list (list (nat * bool))) :
-  (environments nil = nil)
-  /\
-  (forall (x : nat) (xs : list nat),
-     environments (x :: xs) = (map (fun e => (x, true) :: e) (environments xs)) ++
-                              (map (fun e => (x, false) :: e) (environments xs)))
-.
-
 (* compare fold_right and fold_left with primitive iteration and primitive
   recursion over lists *)
+
+Definition unit_tests_for_p_i_over_lists 
+  (candidate : forall T : Type, list T -> (list T -> list T) -> nat -> list T) :=
+(beq_nat_list (candidate nat nil (fun ns => 1 :: ns) 0)
+              nil)
+&&
+(beq_nat_list (candidate nat nil (fun ns => 1 :: ns) 3)
+(1 :: 1 :: 1 :: nil))
+&&
+(* applying reverse repeatedly: *)
+(beq_nat_list (candidate nat (1 :: 2 :: nil) (reverse_v0 nat) 1)
+              (2 :: 1 :: nil)) 
+&&
+(beq_nat_list (candidate nat (1 :: 2 :: nil) (reverse_v0 nat) 2)
+              (1 :: 2 :: nil))
+&&
+(beq_nat_list (candidate nat (1 :: 2 :: nil) (reverse_v0 nat) 3)
+              (2 :: 1 :: nil))
+&&
+(* add to each element: *)
+(beq_nat_list (candidate nat (1 :: 2 :: 3 :: nil) (fun ns => map_v0 nat nat S ns) 1)
+              (2 :: 3 :: 4 :: nil))
+&&
+(beq_nat_list (candidate nat (1 :: 2 :: 3 :: nil) (fun ns => map_v0 nat nat S ns) 3)
+              (4 :: 5 :: 6 :: nil)).
+
+Definition specification_of_p_i_over_lists 
+  (p_i_over_lists : forall T : Type, list T -> (list T -> list T) -> nat -> list T) :=
+  (forall (T : Type)
+          (z : list T)
+          (s : list T -> list T),
+     p_i_over_lists T z s 0 = z)
+  /\
+  (forall (T : Type)
+          (z : list T)
+          (s : list T -> list T)
+          (n' : nat),
+     p_i_over_lists T z s (S n') = s (p_i_over_lists T z s n')).
+
+Theorem there_is_only_one_p_i_over_lists :
+  forall (f g : forall T : Type, list T -> (list T -> list T) -> nat -> list T),
+    specification_of_p_i_over_lists f ->
+    specification_of_p_i_over_lists g ->
+    forall (T : Type)
+           (z : list T)
+           (s : list T -> list T)
+           (n : nat),
+      f T z s n = g T z s n.
+Proof.
+  intros f g [H_f_bc H_f_ic] [H_g_bc H_g_ic].
+  intros T z s n.
+  induction n as [ | n' IHn'].
+    rewrite H_g_bc.
+    apply H_f_bc.
+  rewrite H_f_ic.
+  rewrite IHn'.
+  rewrite H_g_ic.
+  reflexivity.
+Qed.
+
+Definition p_i_over_list_v0 (T : Type)
+                            (z : list T)
+                            (s : (list T -> list T))
+                            (n : nat) :=
+  let fix visit (n : nat) :=
+    match n with
+    | 0 => z
+    | S n' => s (visit n')
+    end
+  in visit n.
+
+Compute unit_tests_for_p_i_over_lists p_i_over_list_v0.
+
