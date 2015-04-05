@@ -746,10 +746,6 @@ Proof.
            H_plus_comm).
 Qed.
 
-
-(* compare fold_right and fold_left with primitive iteration and primitive
-  recursion over lists *)
-
 (* (Olivier, from blackboard)
    Exercise 11 might suggest things to you for your present project.
 
@@ -759,3 +755,76 @@ Revisit the following procedures from last week and define them using fold-right
   * all-possible-environments in the section on Recursive programming: enumerating Boolean environments; and
   * powerset in the section on Recursive programming: computing the powerset of a set.
   * Make your definition go through the unit test of each of these procedures. *)
+
+Fixpoint odd (n : nat) :=
+  match n with
+    | O => false
+    | 1 => true
+    | S (S n) => odd n
+  end.
+
+Definition even (n : nat) :=
+  negb (odd n).
+
+Definition beq_bool (b1 b2 : bool) :=
+  match b1 with
+  | true => b2
+  | false => negb b2
+  end.
+
+Definition beq_bool_list (l1 l2 : list bool) :=
+  beq_list bool l1 l2 beq_bool.
+
+Definition beq_list_nat_list (l1 l2 : list (list nat)) :=
+  beq_list (list nat) l1 l2 beq_nat_list.
+
+Definition unit_tests_for_map (candidate : forall T1 T2, (T1 -> T2) -> list T1 -> list T2) :=
+  (beq_nat_list (candidate nat nat (fun x => x * 10) (1 :: 2 :: 3 :: nil))
+                (10 :: 20 :: 30 :: nil))
+  &&
+  (beq_bool_list (candidate nat bool even (1 :: 2 :: 3 :: nil))
+                 (false :: true :: false :: nil))
+  &&
+  (beq_bool_list (candidate nat bool odd (1 :: 2 :: 3 :: nil))
+                 (true :: false :: true :: nil))
+  &&
+  (beq_bool_list (candidate bool bool negb (true :: false :: nil))
+                 (false :: true :: nil))
+  &&
+  (beq_list_nat_list (candidate nat (list nat) (fun x => (x :: nil)) (1 :: 2 :: 3 :: nil))
+                     ((1 :: nil) :: (2 :: nil) :: (3 :: nil) :: nil)).
+
+Definition specification_of_map (map : forall T1 T2, (T1 -> T2) -> list T1 -> list T2) :=
+  (forall (T1 T2 : Type) 
+          (func : T1 -> T2),
+     map T1 T2 func nil = nil)
+  /\
+  (forall (T1 T2 : Type)
+          (func : T1 -> T2)
+          (v : T1)
+          (vs' : list T1),
+     map T1 T2 func (v :: vs') = func v :: map T1 T2 func vs').
+
+Theorem there_is_only_one_map :
+  forall (m1 m2 : forall T1 T2, (T1 -> T2) -> list T1 -> list T2),
+    specification_of_map m1 ->
+    specification_of_map m2 ->
+    forall (T1 T2 : Type)
+           (func : T1 -> T2)
+           (vs : list T1),
+      m1 T1 T2 func vs = m2 T1 T2 func vs.
+Proof.
+  intros m1 m2 [H_m1_bc H_m1_ic] [H_m2_bc H_m2_ic].
+  intros T1 T2 func vs.
+  induction vs as [ | v vs' IHvs'].
+    rewrite H_m2_bc.
+    apply H_m1_bc.
+  rewrite H_m1_ic.
+  rewrite IHvs'.
+  rewrite H_m2_ic.
+  reflexivity.
+Qed.
+
+(* compare fold_right and fold_left with primitive iteration and primitive
+  recursion over lists *)
+
