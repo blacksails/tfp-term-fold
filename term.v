@@ -1059,10 +1059,10 @@ Proof.
   reflexivity.
 Qed.
 
-Definition p_i_over_list_v0 (T : Type)
-                            (z : list T)
-                            (s : (list T -> list T))
-                            (n : nat) :=
+Definition p_i_over_lists_v0 (T : Type)
+                             (z : list T)
+                             (s : (list T -> list T))
+                             (n : nat) :=
   let fix visit (n : nat) :=
     match n with
     | 0 => z
@@ -1070,5 +1070,31 @@ Definition p_i_over_list_v0 (T : Type)
     end
   in visit n.
 
-Compute unit_tests_for_p_i_over_lists p_i_over_list_v0.
+Compute unit_tests_for_p_i_over_lists p_i_over_lists_v0.
 
+Lemma unfold_p_i_over_lists_v0_bc :
+  forall (T : Type)
+         (z : list T)
+         (s : (list T -> list T)),
+    p_i_over_lists_v0 T z s 0 = z.
+Proof.
+  unfold_tactic p_i_over_lists_v0.
+Qed.
+
+Lemma unfold_p_i_over_lists_v0_ic :
+  forall (T : Type)
+         (z : list T)
+         (s : (list T -> list T))
+         (n' : nat),
+    p_i_over_lists_v0 T z s (S n') = s (p_i_over_lists_v0 T z s n').
+Proof.
+  unfold_tactic p_i_over_lists_v0.
+Qed.
+
+Proposition p_i_over_lists_v0_fits_the_specification_of_p_i_over_lists :
+  specification_of_p_i_over_lists p_i_over_lists_v0.
+Proof.
+  unfold specification_of_p_i_over_lists; split.
+    exact unfold_p_i_over_lists_v0_bc.
+  exact unfold_p_i_over_lists_v0_ic.
+Qed.
