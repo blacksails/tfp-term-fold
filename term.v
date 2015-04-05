@@ -1000,6 +1000,8 @@ Qed.
 (* compare fold_right and fold_left with primitive iteration and primitive
   recursion over lists *)
 
+(* LOOK HERE *)
+
 Definition unit_tests_for_p_i_over_lists 
   (candidate : forall T : Type, list T -> (list T -> list T) -> nat -> list T) :=
 (beq_nat_list (candidate nat nil (fun ns => 1 :: ns) 0)
@@ -1098,3 +1100,115 @@ Proof.
     exact unfold_p_i_over_lists_v0_bc.
   exact unfold_p_i_over_lists_v0_ic.
 Qed.
+
+Definition p_i_v0 (T : Type)
+                  (z : T)
+                  (s : (T -> T))
+                  (n : nat) : T :=
+  let 
+    fix visit (n : nat) :=
+      match n with
+      | 0 => z
+      | S n' => s (visit n')
+      end
+  in visit n.
+
+Definition fold_left_v2 (T1 T2 : Type)
+                        (nil_case : T2)
+                        (cons_case : T1 -> T2 -> T2)
+                        (vs : list T1) :=
+      match
+        p_i_v0 (list T1 * T2) (vs, nil_case) (
+          fun p =>
+            match p with
+            | (v :: vs', res) => (vs', cons_case v res)
+            | _ => p
+          end
+        ) (length vs)
+      with 
+      | (_, result) => result
+      end.
+
+Compute unit_tests_for_fold_left fold_left_v2.
+(* Should we go with this or are we off track? *)
+
+Definition unit_tests_for_p_r_over_lists 
+  (candidate : forall T : Type, list T -> (nat -> list T -> list T) -> nat -> list T) :=
+(beq_nat_list (candidate nat nil (fun n ns => n :: ns) 0)
+              nil)
+&&
+(beq_nat_list (candidate nat nil (fun n ns => n :: ns) 3)
+(3 :: 2 :: 1 :: nil))
+&&
+(* add to each element: *)
+(beq_nat_list (candidate nat (1 :: 2 :: 3 :: nil) (fun n ns => map_v0 nat nat (plus n) ns) 1)
+              (2 :: 3 :: 4 :: nil))
+&&
+(beq_nat_list (candidate nat (1 :: 2 :: 3 :: nil) (fun n ns => map_v0 nat nat (plus n) ns) 3)
+              (7 :: 8 :: 9 :: nil)).
+
+Definition specification_of_p_r_over_lists 
+  (p_r_over_lists : forall T : Type, list T -> (nat -> list T -> list T) -> nat -> list T) :=
+  (forall (T : Type)
+          (z : list T)
+          (s : nat -> list T -> list T),
+     p_r_over_lists T z s 0 = z)
+  /\
+  (forall (T : Type)
+          (z : list T)
+          (s : nat -> list T -> list T)
+          (n' : nat),
+     p_r_over_lists T z s (S n') = s (S n') (p_r_over_lists T z s n')).
+
+Theorem there_is_only_one_p_r_over_lists :
+  forall (f g : forall T : Type, list T -> (nat -> list T -> list T) -> nat -> list T),
+    specification_of_p_r_over_lists f ->
+    specification_of_p_r_over_lists g ->
+    forall (T : Type)
+           (z : list T)
+           (s : nat -> list T -> list T)
+           (n : nat),
+      f T z s n = g T z s n.
+Proof.
+  Admitted.
+
+Definition p_r_over_lists_v0 (T : Type)
+                             (z : list T)
+                             (s : (nat -> list T -> list T))
+                             (n : nat) :=
+  let fix visit (n : nat) :=
+    match n with
+    | 0 => z
+    | S n' => s n (visit n')
+    end
+  in visit n.
+
+Compute unit_tests_for_p_r_over_lists p_r_over_lists_v0.
+
+Lemma unfold_p_r_over_lists_v0_bc :
+  forall (T : Type)
+         (z : list T)
+         (s : (nat -> list T -> list T)),
+    p_r_over_lists_v0 T z s 0 = z.
+Proof.
+  unfold_tactic p_r_over_lists_v0.
+Qed.
+
+Lemma unfold_p_r_over_lists_v0_ic :
+  forall (T : Type)
+         (z : list T)
+         (s : (nat -> list T -> list T))
+         (n' : nat),
+    p_r_over_lists_v0 T z s (S n') = s (S n') (p_r_over_lists_v0 T z s n').
+Proof.
+  unfold_tactic p_r_over_lists_v0.
+Qed.
+
+Proposition p_r_over_lists_v0_fits_the_specification_of_p_r_over_lists :
+  specification_of_p_r_over_lists p_r_over_lists_v0.
+Proof.
+  unfold specification_of_p_r_over_lists; split.
+    exact unfold_p_r_over_lists_v0_bc.
+  exact unfold_p_r_over_lists_v0_ic.
+Qed.
+
