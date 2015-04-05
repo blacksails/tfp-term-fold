@@ -730,6 +730,23 @@ Proof.
            ns').
 Qed.
 
+Proposition same_old_same_old_alternative :
+  (forall n m p : nat,
+     n + (m + p) = n + m + p) ->
+  (forall n m : nat,
+     n + m = m + n) ->
+  forall ns : list nat,
+    fold_right_v0 nat nat 0 plus ns = fold_left_v0 nat nat 0 plus ns.
+Proof.
+  intros H_plus_assoc H_plus_comm ns.
+  apply (fold_right_and_left_on_assoc_and_comm_cons_same_result
+           nat
+           plus
+           H_plus_assoc
+           H_plus_comm).
+Qed.
+
+
 (* compare fold_right and fold_left with primitive iteration and primitive
   recursion over lists *)
 
