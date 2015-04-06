@@ -44,6 +44,16 @@ Definition beq_bool_list (l1 l2 : list bool) :=
 Definition beq_list_nat_list (l1 l2 : list (list nat)) :=
   beq_list (list nat) l1 l2 beq_nat_list.
 
+Fixpoint odd (n : nat) :=
+  match n with
+    | O => false
+    | 1 => true
+    | S (S n) => odd n
+  end.
+
+Definition even (n : nat) :=
+  negb (odd n).
+
 (*****)
 
 (*
@@ -409,6 +419,9 @@ Proof.
   reflexivity.
 Qed.
 
+(*
+* Reverse list
+*)
 Definition unit_tests_for_reverse (reverse : forall T, list T -> list T) :=
   (beq_nat_list (reverse nat nil)
                 nil)
@@ -466,7 +479,7 @@ Definition reverse_v0 (T : Type) (xs : list T) :=
 
 Compute unit_tests_for_reverse reverse_v0.
 
-Proposition about_fold_left_and_append :
+Lemma about_fold_left_and_append :
   forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
     specification_of_fold_left fold_left ->
       forall (T1 : Type)
@@ -539,9 +552,161 @@ Proof.
   reflexivity.
 Qed.
 
-(* define fold_left in term of fold_right, and prove that your definition
-  satisfies the specification of fold_left; *)
+(*
+* Map
+*)
+Definition unit_tests_for_map (candidate : forall T1 T2, (T1 -> T2) -> list T1 -> list T2) :=
+  (beq_nat_list (candidate nat nat (fun x => x * 10) (1 :: 2 :: 3 :: nil))
+                (10 :: 20 :: 30 :: nil))
+  &&
+  (beq_bool_list (candidate nat bool even (1 :: 2 :: 3 :: nil))
+                 (false :: true :: false :: nil))
+  &&
+  (beq_bool_list (candidate nat bool odd (1 :: 2 :: 3 :: nil))
+                 (true :: false :: true :: nil))
+  &&
+  (beq_bool_list (candidate bool bool negb (true :: false :: nil))
+                 (false :: true :: nil))
+  &&
+  (beq_list_nat_list (candidate nat (list nat) (fun x => (x :: nil)) (1 :: 2 :: 3 :: nil))
+                     ((1 :: nil) :: (2 :: nil) :: (3 :: nil) :: nil)).
 
+Definition specification_of_map (map : forall T1 T2, (T1 -> T2) -> list T1 -> list T2) :=
+  (forall (T1 T2 : Type) 
+          (func : T1 -> T2),
+     map T1 T2 func nil = nil)
+  /\
+  (forall (T1 T2 : Type) 
+          (func : T1 -> T2)
+          (v : T1)
+          (vs' : list T1),
+     map T1 T2 func (v :: vs') = func v :: map T1 T2 func vs').
+
+Theorem there_is_only_one_map :
+  forall (f g : forall T1 T2, (T1 -> T2) -> list T1 -> list T2),
+    specification_of_map f ->
+    specification_of_map g ->
+    forall (T1 T2 : Type)
+           (func : T1 -> T2)
+           (vs : list T1),
+      f T1 T2 func vs = g T1 T2 func vs.
+Proof.  
+  intros f g [H_f_nil H_f_cons] [H_g_nil H_g_cons].
+  intros T1 T2 func vs.
+
+  induction vs as [ | v vs' IHvs'].
+    (* NIL CASE *)
+    rewrite H_g_nil.
+    apply H_f_nil.
+  (* CONS CASE *)
+  rewrite H_f_cons.
+  rewrite IHvs'.
+  rewrite H_g_cons.
+  reflexivity.
+Qed.
+
+Definition map_v0 (T1 T2 : Type) (func : T1 -> T2)(vs : list T1) :=
+  fold_right_v0 T1 (list T2) nil (fun x xs => func x :: xs) vs.
+
+Compute unit_tests_for_map map_v0.
+
+Proposition map_v0_fits_specification_of_map :
+  specification_of_map map_v0.
+Proof.
+  unfold specification_of_map, map_v0; split.
+    (* NIL CASE *)
+    intros T1 T2 func.
+    apply unfold_fold_right_v0_nil.
+  (* CONS CASE *)
+  intros T1 T2 func v vs'.
+  rewrite unfold_fold_right_v0_cons.
+  reflexivity.
+Qed.
+
+Definition unit_tests_for_map_append (candidate : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2) :=
+  (beq_nat_list (candidate nat nat (fun x => (x :: nil)) (1 :: 2 :: 3 :: nil))
+                (1 :: 2 :: 3 :: nil))
+  &&
+  (beq_nat_list (candidate nat nat (fun x => (x :: x :: nil)) (1 :: 2 :: 3 :: nil))
+                (1 :: 1 :: 2 :: 2 :: 3 :: 3 :: nil))
+  &&
+  (beq_nat_list (candidate nat nat (fun x => nil) (1 :: 2 :: 3 :: nil))
+                (nil))
+  &&
+  (beq_nat_list (candidate nat nat (fun x => (x :: nil)) nil)
+                (nil)).
+
+Definition specification_of_map_append (map : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2) :=
+  (forall (T1 T2 : Type)
+          (func : T1 -> list T2),
+          map T1 T2 func nil = nil)
+  /\
+  (forall (T1 T2 : Type)
+          (func : T1 -> list T2)
+          (v : T1)
+          (vs' : list T1)
+          (append : forall T : Type, list T -> list T -> list T),
+     specification_of_append append ->
+     map T1 T2 func (v :: vs') = append T2 (func v) (map T1 T2 func vs')).
+
+Theorem there_is_only_one_map_append :
+  forall (f g : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2)
+         (append : forall T : Type, list T -> list T -> list T),
+    specification_of_map_append f ->
+    specification_of_map_append g ->
+    specification_of_append append ->
+    forall (T1 T2 : Type)
+           (func : T1 -> (list T2))
+           (vs : list T1),
+      f T1 T2 func vs = g T1 T2 func vs.
+Proof.  
+  intros f g append
+         [H_f_nil H_f_cons] [H_g_nil H_g_cons].
+  intros S_append.
+  (* We take a copy of S_append before we destruct it *)
+  assert (S_append_tmp := S_append).
+  destruct S_append_tmp as [H_append_bc H_append_ic].
+  intros T1 T2 func vs.
+  
+  induction vs as [ | v vs' IHvs'].
+    (* NIL CASE *)
+    rewrite H_g_nil.
+    apply H_f_nil.
+  (* CONS CASE *)
+  rewrite (H_f_cons T1 T2 func v vs' append S_append).
+  rewrite IHvs'.
+  rewrite (H_g_cons T1 T2 func v vs' append S_append).
+  reflexivity.
+Qed.
+
+Definition map_append_v0 (T1 T2 : Type) (func : T1 -> list T2)(vs : list T1) :=
+  fold_right_v0 T1 (list T2) nil (fun x xs => append_v0 T2 (func x) xs) vs.
+
+Compute unit_tests_for_map_append map_append_v0.
+
+Proposition map_append_v0_fits_specification_of_map_append :
+  specification_of_map_append map_append_v0.
+Proof.
+  unfold specification_of_map_append, map_append_v0; split.
+    (* NIL CASE *)
+    intros T1 T2 func.
+    apply unfold_fold_right_v0_nil.
+  (* CONS CASE *)
+  intros T1 T2 func v vs' append S_append.
+  rewrite unfold_fold_right_v0_cons.
+  rewrite (there_is_only_one_append append 
+                                    append_v0
+                                    S_append
+                                    append_v0_fits_the_specification_of_append).
+  reflexivity.
+Qed.
+
+(*****)
+
+(* 
+* We will now look into how we can define fold_right in terms of fold and vice
+* versa.
+*)
 Definition fold_left_v1 (T1 T2 : Type)
                         (nil_case : T2)
                         (cons_case : T1 -> T2 -> T2)
@@ -556,8 +721,7 @@ Definition fold_left_v1 (T1 T2 : Type)
 Proposition fold_left_v1_fits_the_specification_of_fold_left :
     specification_of_fold_left fold_left_v1.
 Proof.
-  unfold specification_of_fold_left, fold_left_v1.
-  split.
+  unfold specification_of_fold_left, fold_left_v1; split.
     (* NIL CASE *)
     apply unfold_fold_right_v0_nil.
   (* CONS CASE *)
@@ -851,165 +1015,6 @@ Proof.
            plus
            H_plus_assoc
            H_plus_comm).
-Qed.
-
-(* (Olivier, from blackboard)
-   Exercise 11 might suggest things to you for your present project.
-
-Revisit the following procedures from last week and define them using fold-right_proper-list.
-  * map1 in the section on Mapping procedures over proper lists;
-*)
-
-Fixpoint odd (n : nat) :=
-  match n with
-    | O => false
-    | 1 => true
-    | S (S n) => odd n
-  end.
-
-Definition even (n : nat) :=
-  negb (odd n).
-
-Definition unit_tests_for_map (candidate : forall T1 T2, (T1 -> T2) -> list T1 -> list T2) :=
-  (beq_nat_list (candidate nat nat (fun x => x * 10) (1 :: 2 :: 3 :: nil))
-                (10 :: 20 :: 30 :: nil))
-  &&
-  (beq_bool_list (candidate nat bool even (1 :: 2 :: 3 :: nil))
-                 (false :: true :: false :: nil))
-  &&
-  (beq_bool_list (candidate nat bool odd (1 :: 2 :: 3 :: nil))
-                 (true :: false :: true :: nil))
-  &&
-  (beq_bool_list (candidate bool bool negb (true :: false :: nil))
-                 (false :: true :: nil))
-  &&
-  (beq_list_nat_list (candidate nat (list nat) (fun x => (x :: nil)) (1 :: 2 :: 3 :: nil))
-                     ((1 :: nil) :: (2 :: nil) :: (3 :: nil) :: nil)).
-
-Definition specification_of_map (map : forall T1 T2, (T1 -> T2) -> list T1 -> list T2) :=
-  (forall (T1 T2 : Type) 
-          (func : T1 -> T2),
-     map T1 T2 func nil = nil)
-  /\
-  (forall (T1 T2 : Type) 
-          (func : T1 -> T2)
-          (v : T1)
-          (vs' : list T1),
-     map T1 T2 func (v :: vs') = func v :: map T1 T2 func vs').
-
-Theorem there_is_only_one_map :
-  forall (m1 m2 : forall T1 T2, (T1 -> T2) -> list T1 -> list T2),
-    specification_of_map m1 ->
-    specification_of_map m2 ->
-    forall (T1 T2 : Type)
-           (func : T1 -> T2)
-           (vs : list T1),
-      m1 T1 T2 func vs = m2 T1 T2 func vs.
-Proof.  
-  intros m1 m2 [H_m1_bc H_m1_ic] [H_m2_bc H_m2_ic].
-  intros T1 T2 func vs.
-  induction vs as [ | v vs' IHvs'].
-    rewrite H_m2_bc.
-    apply H_m1_bc.
-  rewrite H_m1_ic.
-  rewrite IHvs'.
-  rewrite H_m2_ic.
-  reflexivity.
-Qed.
-
-Definition map_v0 (T1 T2 : Type) (func : T1 -> T2)(vs : list T1) :=
-  fold_right_v0 T1 (list T2) nil (fun x xs => func x :: xs) vs.
-
-Compute unit_tests_for_map map_v0.
-
-Proposition map_v0_fits_specification_of_map :
-  specification_of_map map_v0.
-Proof.
-  unfold specification_of_map, map_v0; split.
-
-  intros T1 T2 func.
-  apply unfold_fold_right_v0_nil.
-  
-  intros T1 T2 func v vs'.
-  rewrite -> unfold_fold_right_v0_cons.
-  reflexivity.
-Qed.
-
-(*  map1-append in the section on Mapping procedures over proper lists, continued; *)
-
-Definition unit_tests_for_map_append (candidate : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2) :=
-  (beq_nat_list (candidate nat nat (fun x => (x :: nil)) (1 :: 2 :: 3 :: nil))
-                (1 :: 2 :: 3 :: nil))
-  &&
-  (beq_nat_list (candidate nat nat (fun x => (x :: x :: nil)) (1 :: 2 :: 3 :: nil))
-                (1 :: 1 :: 2 :: 2 :: 3 :: 3 :: nil))
-  &&
-  (beq_nat_list (candidate nat nat (fun x => nil) (1 :: 2 :: 3 :: nil))
-                (nil))
-  &&
-  (beq_nat_list (candidate nat nat (fun x => (x :: nil)) nil)
-                (nil)).
-
-Definition specification_of_map_append (map : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2) :=
-  (forall (T1 T2 : Type)
-          (func : T1 -> list T2),
-          map T1 T2 func nil = nil)
-  /\
-  (forall (T1 T2 : Type)
-          (func : T1 -> list T2)
-          (v : T1)
-          (vs' : list T1)
-          (append : forall T : Type, list T -> list T -> list T),
-     specification_of_append append ->
-     map T1 T2 func (v :: vs') = append T2 (func v) (map T1 T2 func vs')).
-
-Theorem there_is_only_one_map_append :
-  forall (m1 m2 : forall T1 T2, (T1 -> (list T2)) -> list T1 -> list T2)
-         (append : forall T : Type, list T -> list T -> list T),
-    specification_of_map_append m1 ->
-    specification_of_map_append m2 ->
-    specification_of_append append ->
-    forall (T1 T2 : Type)
-           (func : T1 -> (list T2))
-           (vs : list T1),
-      m1 T1 T2 func vs = m2 T1 T2 func vs.
-Proof.  
-  intros m1 m2 append
-         [H_m1_bc H_m1_ic] [H_m2_bc H_m2_ic].
-  intros S_append.
-  assert (S_append_tmp := S_append).
-  destruct S_append_tmp as [H_append_bc H_append_ic].
-  intros T1 T2 func vs.
-  
-  induction vs as [ | v vs' IHvs'].
-    rewrite H_m2_bc.
-    apply H_m1_bc.
-  rewrite -> (H_m1_ic T1 T2 func v vs' append S_append).
-  rewrite -> IHvs'.
-  rewrite -> (H_m2_ic T1 T2 func v vs' append S_append).
-  reflexivity.
-Qed.
-
-Definition map_append_v0 (T1 T2 : Type) (func : T1 -> list T2)(vs : list T1) :=
-  fold_right_v0 T1 (list T2) nil (fun x xs => append_v0 T2 (func x) xs) vs.
-
-Compute unit_tests_for_map_append map_append_v0.
-
-Proposition map_append_v0_fits_specification_of_map_append :
-  specification_of_map_append map_append_v0.
-Proof.
-  unfold specification_of_map_append, map_append_v0; split.
-
-  intros T1 T2 func.
-  apply unfold_fold_right_v0_nil.
-  
-  intros T1 T2 func v vs' append S_append.
-  rewrite -> unfold_fold_right_v0_cons.
-
-  rewrite -> (there_is_only_one_append append append_v0).
-  reflexivity.
-  apply S_append.
-  apply append_v0_fits_the_specification_of_append.
 Qed.
 
 (* compare fold_right and fold_left with primitive iteration and primitive
