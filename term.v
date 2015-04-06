@@ -1000,105 +1000,105 @@ Qed.
 (* compare fold_right and fold_left with primitive iteration and primitive
   recursion over lists *)
 
-(* LOOK HERE *)
+Definition unit_tests_for_p_i_over_polymorphic_lists 
+  (candidate : forall T1 T2 : Type, T2 -> (T1 -> T2 -> T2) -> list T1 -> T2) :=
+  (* replace each number with a one *)
+  (beq_nat_list (candidate nat (list nat) nil (fun n ns => 1 :: ns) nil)
+                nil)
+  &&
+  (beq_nat_list (candidate nat (list nat) nil (fun n ns => 1 :: ns) (1 :: 2 :: 3 :: nil))
+                (1 :: 1 :: 1 :: nil))
+  &&
+  (* double each number *)
+  (beq_nat_list (candidate nat (list nat) nil (fun n ns => 2 * n :: ns) (1 :: 2 :: 3 :: nil))
+                (2 :: 4 :: 6 :: nil)) 
+  &&
+  (* sum of list *)
+  (beq_nat (candidate nat nat 0 (fun n ns => n + ns) (1 :: 2 :: 3 :: nil))
+           6)
+  &&
+  (* identity and appending *)
+  (beq_nat_list (candidate nat (list nat) nil (fun n ns => n :: ns) (1 :: 2 :: 3 :: nil))
+                (1 :: 2 :: 3 :: nil))
+  &&
+  (beq_nat_list (candidate nat (list nat) (3 :: nil) (fun n ns => n :: ns) (1 :: 2 :: nil))
+                (1 :: 2 :: 3 :: nil)).
 
-Definition unit_tests_for_p_i_over_lists 
-  (candidate : forall T : Type, list T -> (list T -> list T) -> nat -> list T) :=
-(beq_nat_list (candidate nat nil (fun ns => 1 :: ns) 0)
-              nil)
-&&
-(beq_nat_list (candidate nat nil (fun ns => 1 :: ns) 3)
-(1 :: 1 :: 1 :: nil))
-&&
-(* applying reverse repeatedly: *)
-(beq_nat_list (candidate nat (1 :: 2 :: nil) (reverse_v0 nat) 1)
-              (2 :: 1 :: nil)) 
-&&
-(beq_nat_list (candidate nat (1 :: 2 :: nil) (reverse_v0 nat) 2)
-              (1 :: 2 :: nil))
-&&
-(beq_nat_list (candidate nat (1 :: 2 :: nil) (reverse_v0 nat) 3)
-              (2 :: 1 :: nil))
-&&
-(* add to each element: *)
-(beq_nat_list (candidate nat (1 :: 2 :: 3 :: nil) (fun ns => map_v0 nat nat S ns) 1)
-              (2 :: 3 :: 4 :: nil))
-&&
-(beq_nat_list (candidate nat (1 :: 2 :: 3 :: nil) (fun ns => map_v0 nat nat S ns) 3)
-              (4 :: 5 :: 6 :: nil)).
+Definition specification_of_p_i_over_polymorphic_lists 
+  (p_i : forall T1 T2, T2 -> (T1 -> T2 -> T2) -> list T1 -> T2) := 
+  (forall (T1 T2 : Type) 
+          (n : T2) 
+          (c : T1 -> T2 -> T2), 
+     p_i T1 T2 n c nil = n) 
+  /\ 
+  (forall (T1 T2 : Type) 
+          (n : T2) 
+          (c : T1 -> T2 -> T2) 
+          (v : T1) 
+          (vs' : list T1), 
+     p_i T1 T2 n c (v :: vs') = c v (p_i T1 T2 n c vs')). 
 
-Definition specification_of_p_i_over_lists 
-  (p_i_over_lists : forall T : Type, list T -> (list T -> list T) -> nat -> list T) :=
-  (forall (T : Type)
-          (z : list T)
-          (s : list T -> list T),
-     p_i_over_lists T z s 0 = z)
-  /\
-  (forall (T : Type)
-          (z : list T)
-          (s : list T -> list T)
-          (n' : nat),
-     p_i_over_lists T z s (S n') = s (p_i_over_lists T z s n')).
-
-Theorem there_is_only_one_p_i_over_lists :
-  forall (f g : forall T : Type, list T -> (list T -> list T) -> nat -> list T),
-    specification_of_p_i_over_lists f ->
-    specification_of_p_i_over_lists g ->
-    forall (T : Type)
-           (z : list T)
-           (s : list T -> list T)
-           (n : nat),
-      f T z s n = g T z s n.
+Theorem there_is_only_one_p_i_over_polymorphic_lists :
+  forall (p_i1 p_i2 : forall T1 T2 : Type, T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
+    specification_of_p_i_over_polymorphic_lists p_i1 ->
+    specification_of_p_i_over_polymorphic_lists p_i2 ->
+    forall (T1 T2 : Type)
+           (n : T2)
+           (c : T1 -> T2 -> T2)
+           (vs : list T1),
+      p_i1 T1 T2 n c vs = p_i2 T1 T2 n c vs.
 Proof.
-  intros f g [H_f_bc H_f_ic] [H_g_bc H_g_ic].
-  intros T z s n.
-  induction n as [ | n' IHn'].
-    rewrite H_g_bc.
-    apply H_f_bc.
-  rewrite H_f_ic.
-  rewrite IHn'.
-  rewrite H_g_ic.
+  intros p_i1 p_i2 [H_p_i1_nil H_p_i1_cons] [H_p_i2_nil H_p_i2_cons].
+  intros T1 T2 n c vs.
+  induction vs as [ | v vs' IHvs'].
+    rewrite H_p_i2_nil.
+    apply H_p_i1_nil.
+  rewrite H_p_i1_cons.
+  rewrite IHvs'.
+  rewrite H_p_i2_cons.
   reflexivity.
 Qed.
 
-Definition p_i_over_lists_v0 (T : Type)
-                             (z : list T)
-                             (s : (list T -> list T))
-                             (n : nat) :=
-  let fix visit (n : nat) :=
-    match n with
-    | 0 => z
-    | S n' => s (visit n')
+Definition p_i_over_polymorphic_lists_v0 (T1 T2 : Type)
+                             (n : T2)
+                             (c : (T1 -> T2 -> T2))
+                             (vs : list T1) :=
+  let fix visit vs :=
+    match vs with
+    | nil => n
+    | v :: vs' => c v (visit vs')
     end
-  in visit n.
+  in visit vs.
 
-Compute unit_tests_for_p_i_over_lists p_i_over_lists_v0.
+Compute unit_tests_for_p_i_over_polymorphic_lists p_i_over_polymorphic_lists_v0.
 
-Lemma unfold_p_i_over_lists_v0_bc :
-  forall (T : Type)
-         (z : list T)
-         (s : (list T -> list T)),
-    p_i_over_lists_v0 T z s 0 = z.
+Lemma unfold_p_i_over_polymorphic_lists_v0_bc :
+  forall (T1 T2 : Type)
+         (n : T2)
+         (c : T1 -> T2 -> T2),
+    p_i_over_polymorphic_lists_v0 T1 T2 n c nil = n.
 Proof.
-  unfold_tactic p_i_over_lists_v0.
+  unfold_tactic p_i_over_polymorphic_lists_v0.
 Qed.
 
-Lemma unfold_p_i_over_lists_v0_ic :
-  forall (T : Type)
-         (z : list T)
-         (s : (list T -> list T))
-         (n' : nat),
-    p_i_over_lists_v0 T z s (S n') = s (p_i_over_lists_v0 T z s n').
+Lemma unfold_p_i_over_polymorphic_lists_v0_ic :
+  forall (T1 T2 : Type)
+         (n : T2)
+         (c : T1 -> T2 -> T2)
+         (v : T1)
+         (vs' : list T1),
+    p_i_over_polymorphic_lists_v0 T1 T2 n c (v :: vs') = 
+    c v (p_i_over_polymorphic_lists_v0 T1 T2 n c vs').
 Proof.
-  unfold_tactic p_i_over_lists_v0.
+  unfold_tactic p_i_over_polymorphic_lists_v0.
 Qed.
 
 Proposition p_i_over_lists_v0_fits_the_specification_of_p_i_over_lists :
-  specification_of_p_i_over_lists p_i_over_lists_v0.
+  specification_of_p_i_over_polymorphic_lists p_i_over_polymorphic_lists_v0.
 Proof.
-  unfold specification_of_p_i_over_lists; split.
-    exact unfold_p_i_over_lists_v0_bc.
-  exact unfold_p_i_over_lists_v0_ic.
+  unfold specification_of_p_i_over_polymorphic_lists; split.
+    exact unfold_p_i_over_polymorphic_lists_v0_bc.
+  exact unfold_p_i_over_polymorphic_lists_v0_ic.
 Qed.
 
 Definition p_i_v0 (T : Type)
