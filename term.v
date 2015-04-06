@@ -1101,38 +1101,96 @@ Proof.
   exact unfold_p_i_over_polymorphic_lists_v0_ic.
 Qed.
 
-Definition p_i_v0 (T : Type)
-                  (z : T)
-                  (s : (T -> T))
-                  (n : nat) : T :=
-  let 
-    fix visit (n : nat) :=
-      match n with
-      | 0 => z
-      | S n' => s (visit n')
-      end
-  in visit n.
+Proposition fold_right_from_p_i_over_polymorphic_lists :
+  forall p_i : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2,
+    specification_of_p_i_over_polymorphic_lists p_i ->
+    specification_of_fold_right p_i.
+Proof.
+  intros p_i [H_p_i_nil H_p_i_cons].
+  unfold specification_of_fold_right; split.
+    exact H_p_i_nil.
+  exact H_p_i_cons.
+Qed.
+
+Definition fold_right_v2 (T1 T2 : Type)
+                         (nil_case : T2)
+                         (cons_case : T1 -> T2 -> T2)
+                         (vs : list T1) :=
+  p_i_over_polymorphic_lists_v0 T1 T2 nil_case cons_case vs.
+
+Compute unit_tests_for_fold_right fold_right_v2.
+
+Proposition fold_right_v2_fits_the_specification_of_fold_right :
+  specification_of_fold_right fold_right_v2.
+Proof.
+  unfold fold_right_v2.
+  apply fold_right_from_p_i_over_polymorphic_lists.
+  apply p_i_over_lists_v0_fits_the_specification_of_p_i_over_lists.
+Qed.
+
+Lemma fold_right_and_p_i_over_polymorphic_lists_are_the_same_thing :
+  forall (fold_right p_i : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
+    specification_of_fold_right fold_right ->
+    specification_of_p_i_over_polymorphic_lists p_i ->
+    forall (T1 T2 : Type)
+           (n : T2)
+           (c : T1 -> T2 -> T2)
+           (vs : list T1),
+      fold_right T1 T2 n c vs = p_i T1 T2 n c vs.
+Proof.
+  intros fold_right p_i 
+         [H_fold_right_nil H_fold_right_cons] [H_p_i_nil H_p_i_cons].
+  induction vs as [ | v vs' IHvs'].
+    rewrite H_p_i_nil.
+    apply H_fold_right_nil.
+  rewrite H_fold_right_cons.
+  rewrite IHvs'.
+  rewrite H_p_i_cons.
+  reflexivity.
+Qed.
+
+Proposition fold_left_from_fold_right :
+  forall fold_right : fold_type,
+    specification_of_fold_right fold_right ->
+    specification_of_fold_left (
+      fun T1 T2 nil_case cons_case vs =>
+        fold_right T1 
+                   (T2 -> T2) 
+                   (fun a => a)
+                   (fun x h a => h (cons_case x a))
+                   vs
+                   nil_case).
+Proof.
+  intros fold_right [H_fold_right_nil H_fold_right_cons].
+  unfold specification_of_fold_left; split.
+    intros T1 T2 nil_case cons_case.
+    rewrite H_fold_right_nil.
+    reflexivity.
+  intros T1 T2 nil_case cons_case v vs.
+  rewrite H_fold_right_cons.
+  reflexivity.
+Qed.
 
 Definition fold_left_v2 (T1 T2 : Type)
                         (nil_case : T2)
-                        (cons_case : T1 -> T2 -> T2)
+                        (cons_case : (T1 -> T2 -> T2))
                         (vs : list T1) :=
-      match
-        p_i_v0 (list T1 * T2) (vs, nil_case) (
-          fun p =>
-            match p with
-            | (v :: vs', res) => (vs', cons_case v res)
-            | _ => p
-          end
-        ) (length vs)
-      with 
-      | (_, result) => result
-      end.
+  fold_right_v2 T1
+                (T2 -> T2)
+                (fun a => a)
+                (fun x h a => h (cons_case x a))
+                vs
+                nil_case.
 
-Compute unit_tests_for_fold_left fold_left_v2.
-(* Should we go with this or are we off track? *)
+Proposition fold_left_v2_fits_the_specification_of_fold_left :
+  specification_of_fold_left fold_left_v2.
+Proof.
+  unfold fold_left_v2.
+  apply fold_left_from_fold_right.
+  apply fold_right_v2_fits_the_specification_of_fold_right.
+Qed.
 
-Definition unit_tests_for_p_r_over_lists 
+Definition unit_tests_for_p_r_over_polymorphic_lists 
   (candidate : forall T : Type, list T -> (nat -> list T -> list T) -> nat -> list T) :=
 (beq_nat_list (candidate nat nil (fun n ns => n :: ns) 0)
               nil)
