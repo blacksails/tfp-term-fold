@@ -52,20 +52,26 @@ Definition beq_list_nat_list (l1 l2 : list (list nat)) :=
 Definition unit_tests_for_fold_right (candidate : forall T1 T2, T2 -> (T1 -> T2 -> T2) -> list T1 -> T2) :=
   (* Nil list always returns nil case. Cons case doesn't any influence *)
   (beq_nat (candidate nat nat 42 plus nil)
-           42) &&
+           42) 
+  &&
   (beq_nat (candidate nat nat 42 mult nil)
-           42) &&
+           42) 
+  &&
   (* Simple cons cases *)
   (beq_nat (candidate nat nat 21 plus (21 :: nil))
-           (21 + 21)) &&
+           (21 + 21)) 
+  &&
   (beq_nat (candidate nat nat 21 mult (2 :: nil))
-           (2 * 21)) &&
+           (2 * 21)) 
+  &&
   (* Sum function for list of nat *)
   (beq_nat (candidate nat nat 0 plus (1 :: 2 :: 3 :: 4 :: 5 :: nil))
-           (1 + (2 + (3 + (4 + (5 + 0)))))) &&
-  (* Factorial function for list of nat *)
+           (1 + (2 + (3 + (4 + (5 + 0)))))) 
+  &&
+  (* Product function for list of nat *)
   (beq_nat (candidate nat nat 1 mult (1 :: 2 :: 3 :: 4 :: 5 :: nil))
-           (1 * (2 * (3 * (4 * (5 * 1)))))) &&
+           (1 * (2 * (3 * (4 * (5 * 1))))))
+  &&
   (* Identity of list *)
   (beq_nat_list (candidate nat (list nat) nil (fun n ns => n :: ns) (1 :: 2 :: 3 :: nil))
                 (1 :: (2 :: (3 :: nil)))).
@@ -158,18 +164,21 @@ Qed.
 Definition unit_tests_for_fold_left (candidate : forall T1 T2, T2 -> (T1 -> T2 -> T2) -> list T1 -> T2) :=
   (* Nil list always returns nil case. Cons case doesn't any influence *)
   (beq_nat (candidate nat nat 42 plus nil)
-           42) &&
+           42) 
+  &&
   (beq_nat (candidate nat nat 42 mult nil)
-           42) &&
+           42) 
+  &&
   (* Simple cons cases *)
   (beq_nat (candidate nat nat 21 plus (21 :: nil))
-           (21 + 21)) &&
+           (21 + 21)) 
+  &&
   (beq_nat (candidate nat nat 21 mult (2 :: nil))
            (2 * 21)) &&
   (* Sum function for list of nat *)
   (beq_nat (candidate nat nat 0 plus (1 :: 2 :: 3 :: 4 :: 5 :: nil))
            (5 + (4 + (3 + (2 + (1 + 0)))))) &&
-  (* Factorial function for list of nat *)
+  (* Product function for list of nat *)
   (beq_nat (candidate nat nat 1 mult (1 :: 2 :: 3 :: 4 :: 5 :: nil))
            (5 * (4 * (3 * (2 * (1 * 1)))))) &&
   (* Reverse of list *)
@@ -346,17 +355,17 @@ Theorem there_is_only_one_append :
     forall (T : Type) (xs ys : list T),
       f T xs ys = g T xs ys.
 Proof.
-  intros f g [H_f_bc H_f_ic] [H_g_bc H_g_ic].
+  intros f g [H_f_nil H_f_cons] [H_g_nil H_g_cons].
   intros T xs ys.
 
   induction xs as [ | x xs' IHxs' ].
     (* NIL CASE *)
-    rewrite H_g_bc.
-    apply H_f_bc.
+    rewrite H_g_nil.
+    apply H_f_nil.
   (* CONS CASE *)
-  rewrite H_f_ic.
+  rewrite H_f_cons.
   rewrite IHxs'.
-  rewrite H_g_ic.
+  rewrite H_g_cons.
   reflexivity.
 Qed.
 
@@ -378,45 +387,52 @@ Proof.
   reflexivity.
 Qed.
 
+(* We will need this property when we look at reverse *)
 Theorem append_is_associative :
   forall (append : forall T, list T -> list T -> list T),
     specification_of_append append ->
     forall (T : Type) (x y z : list T),
     append T x (append T y z) = append T (append T x y) z.
 Proof.
-  intros append [H_append_bc H_append_ic].
+  intros append [H_append_nil H_append_cons].
   intros T xs ys zs.
+
   induction xs as [ | x xs' IHxs'].
-    rewrite ->2 H_append_bc.
+    (* NIL CASE *)
+    rewrite ->2 H_append_nil.
     reflexivity.
-  rewrite H_append_ic.
+  (* CONS CASE *)
+  rewrite H_append_cons.
   rewrite IHxs'.
-  rewrite H_append_ic.
-  rewrite H_append_ic.
+  rewrite H_append_cons.
+  rewrite H_append_cons.
   reflexivity.
 Qed.
 
-Definition unit_tests_for_reverse_nat (reverse : forall T, list T -> list T) :=
+Definition unit_tests_for_reverse (reverse : forall T, list T -> list T) :=
   (beq_nat_list (reverse nat nil)
-                  nil)
+                nil)
   &&
   (beq_nat_list (reverse nat (1 :: nil))
-                  (1 :: nil))
+                (1 :: nil))
   &&
   (beq_nat_list (reverse nat (1 :: 2 :: nil))
-                  (2 :: 1 :: nil))
+                (2 :: 1 :: nil))
   &&
   (beq_nat_list (reverse nat (1 :: 2 :: 3 :: nil))
-                  (3 :: 2 :: 1 :: nil)).
+                (3 :: 2 :: 1 :: nil))
+  &&
+  (beq_bool_list (reverse bool (true :: false :: nil))
+                 (false :: true :: nil)).
   
 Definition specification_of_reverse (reverse : forall T, list T -> list T) :=
   (forall (T : Type),
      reverse T nil = nil)
   /\
-  (forall (T : Type) (x : T) (xs' : list T)
+  (forall (T : Type) (v : T) (vs' : list T)
           (append : forall T, list T -> list T -> list T),
      specification_of_append append ->
-     reverse T (x :: xs') = append T (reverse T xs') (x :: nil)).
+     reverse T (v :: vs') = append T (reverse T vs') (v :: nil)).
 
 Theorem there_is_only_one_reverse :
   forall (f g : forall T, list T -> list T)
@@ -424,30 +440,31 @@ Theorem there_is_only_one_reverse :
     specification_of_reverse f ->
     specification_of_reverse g ->
     specification_of_append append ->
-    forall (T : Type) (xs : list T),
-      f T xs = g T xs.
+    forall (T : Type) (vs : list T),
+      f T vs = g T vs.
 Proof.
-  intros f g append [Sf_bc Sf_ic] [Sg_bc Sg_ic].
+  intros f g append [H_f_nil H_f_cons] [H_g_nil H_g_cons].
   intros S_append.
-  assert (S_append_tmp := S_append).
+  (* We will need S_append later, so we save a copy *)
+  assert (S_append_tmp := S_append). 
   destruct S_append_tmp as [S_append_bc S_append_ic].    
   intros T xs.
 
   induction xs as [ | x xs' IHxs' ].
-
-  rewrite -> Sg_bc.
-  apply Sf_bc.
-
-  rewrite -> (Sf_ic T x xs' append S_append).
-  rewrite -> IHxs'.
-  rewrite -> (Sg_ic T x xs' append S_append).
+    (* NIL CASE *)
+    rewrite H_g_nil.
+    apply H_f_nil.
+  (* CONS CASE *)
+  rewrite (H_f_cons T x xs' append S_append).
+  rewrite IHxs'.
+  rewrite (H_g_cons T x xs' append S_append).
   reflexivity.
 Qed.
 
 Definition reverse_v0 (T : Type) (xs : list T) :=
   fold_left_v0 T (list T) nil (fun n ns => n :: ns) xs.
 
-Compute unit_tests_for_reverse_nat reverse_v0.
+Compute unit_tests_for_reverse reverse_v0.
 
 Proposition about_fold_left_and_append :
   forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
@@ -473,7 +490,8 @@ Proposition about_fold_left_and_append :
 Proof.
   intros fold_left [H_fold_left_nil H_fold_left_cons].
   intros T1 vs x xs.
-  intros append S_append;
+  intros append S_append.
+  (* We will need S_append later, so we take a copy. *)
   assert (S_append_tmp := S_append);
   destruct S_append_tmp as [H_append_bc H_append_ic].
   revert x xs.
@@ -500,11 +518,12 @@ Proposition reverse_v0_fits_the_specification_of_reverse :
   specification_of_reverse reverse_v0.
 Proof.
   unfold specification_of_reverse, reverse_v0; split.  
-  (* NIL CASE *)
+    (* NIL CASE *)
     intros T.
     apply unfold_fold_left_v0_nil.
   (* CONS CASE *)
-  intros T x xs' append S_append.    
+  intros T x xs' append S_append.
+  (* We take a copy of S_append, before destructing *)
   assert (S_append_tmp := S_append);
   destruct S_append_tmp as [H_append_bc H_append_ic].    
   rewrite unfold_fold_left_v0_cons.
