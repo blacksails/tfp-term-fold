@@ -707,6 +707,34 @@ Qed.
 * We will now look into how we can define fold_right in terms of fold and vice
 * versa.
 *)
+
+(*
+* Fold left from fold right
+*)
+Proposition fold_left_from_fold_right :
+  forall fold_right : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2,
+    specification_of_fold_right fold_right ->
+    specification_of_fold_left (
+      fun T1 T2 nil_case cons_case vs =>
+        fold_right T1 
+                   (T2 -> T2) 
+                   (fun a => a)
+                   (fun x h a => h (cons_case x a))
+                   vs
+                   nil_case).
+Proof.
+  intros fold_right [H_fold_right_nil H_fold_right_cons].
+  unfold specification_of_fold_left; split.
+    (* NIL CASE *)
+    intros T1 T2 nil_case cons_case.
+    rewrite H_fold_right_nil.
+    reflexivity.
+  (* CONS CASE *)
+  intros T1 T2 nil_case cons_case v vs.
+  rewrite H_fold_right_cons.
+  reflexivity.
+Qed.
+
 Definition fold_left_v1 (T1 T2 : Type)
                         (nil_case : T2)
                         (cons_case : T1 -> T2 -> T2)
@@ -718,21 +746,19 @@ Definition fold_left_v1 (T1 T2 : Type)
                 vs
                 nil_case.
 
+Compute unit_tests_for_fold_left fold_left_v1.
+
 Proposition fold_left_v1_fits_the_specification_of_fold_left :
     specification_of_fold_left fold_left_v1.
 Proof.
-  unfold specification_of_fold_left, fold_left_v1; split.
-    (* NIL CASE *)
-    apply unfold_fold_right_v0_nil.
-  (* CONS CASE *)
-  intros T1 T2 nil_case cons_case v vs'.
-  rewrite unfold_fold_right_v0_cons.
-  reflexivity.
+  unfold fold_left_v1.
+  apply fold_left_from_fold_right.
+  apply fold_right_v0_fits_the_specification_of_fold_right.
 Qed.
 
-(* define fold_right in term of fold_left, and prove that your definition
-  satisfies the specification of fold_right; *)
-
+(*
+* Fold right from fold left
+*)
 Proposition fold_right_from_fold_left_aux :
   forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
     specification_of_fold_left fold_left ->
@@ -756,16 +782,15 @@ Proposition fold_right_from_fold_left_aux :
 Proof.
   intros fold_left [H_fold_left_nil H_fold_left_cons].
   intros T1 T2 nil_case cons_case vs.
-
+  (* We strengthen the IH by not introducing k *)
+ 
   induction vs as [ | v vs' IHvs' ]; intro k.
     (* NIL CASE *)
     rewrite ->2 H_fold_left_nil.
     reflexivity.
   (* CONS CASE *)
-  (* left hand side *)
   rewrite H_fold_left_cons.
   rewrite IHvs'.
-  (* right hand side *)
   rewrite H_fold_left_cons.
   rewrite (IHvs' (fun a : T2 => cons_case v a)).
   reflexivity.    
@@ -782,8 +807,8 @@ Proposition fold_right_from_fold_left :
                                              vs
                                              nil_case).
 Proof.
-  intros fold_left S_fold_left_tmp.
-  assert (S_fold_left := S_fold_left_tmp).
+  intros fold_left S_fold_left.
+  assert (S_fold_left_tmp := S_fold_left);
   destruct S_fold_left_tmp as [H_fold_left_nil H_fold_left_cons].
 
   unfold specification_of_fold_right; split.
@@ -818,15 +843,7 @@ Proposition fold_right_v1_fits_the_specification_of_fold_right :
     specification_of_fold_right fold_right_v1.
 Proof.
   unfold fold_right_v1.
-  (* 
-    We have already shown that the goal holds if the implementation of fold_left
-    that we use fits the specification of fold_left. Let's use that knowledge!
-  *)
   apply fold_right_from_fold_left.
-  (* 
-    Now we just have to prove that fold_left_v0 fits the specification which
-    we have already proven. 
-  *)
   apply fold_left_v0_fits_the_specification_of_fold_left.
 Qed.
 
@@ -1166,28 +1183,6 @@ Proof.
   rewrite H_fold_right_cons.
   rewrite IHvs'.
   rewrite H_p_i_cons.
-  reflexivity.
-Qed.
-
-Proposition fold_left_from_fold_right :
-  forall fold_right : fold_type,
-    specification_of_fold_right fold_right ->
-    specification_of_fold_left (
-      fun T1 T2 nil_case cons_case vs =>
-        fold_right T1 
-                   (T2 -> T2) 
-                   (fun a => a)
-                   (fun x h a => h (cons_case x a))
-                   vs
-                   nil_case).
-Proof.
-  intros fold_right [H_fold_right_nil H_fold_right_cons].
-  unfold specification_of_fold_left; split.
-    intros T1 T2 nil_case cons_case.
-    rewrite H_fold_right_nil.
-    reflexivity.
-  intros T1 T2 nil_case cons_case v vs.
-  rewrite H_fold_right_cons.
   reflexivity.
 Qed.
 
