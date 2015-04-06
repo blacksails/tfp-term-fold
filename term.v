@@ -1,14 +1,16 @@
 (*
-
-Project about fold_right and fold_left
-Given the two specifications
-
+* Project about fold_right and fold_left
+* Authors: Benjamin Hammer Nørgaard
+*          Jan Philip
 *)
 
 Require Import Bool List Arith.
 Ltac unfold_tactic name := intros; unfold name; reflexivity.
 
-(* We will use the following function to construct a function which compares two nat lists *)
+(* 
+* The following functions are not used directly in the project. We only use them 
+* in unit tests, and therefore we wont go into much detail about what they do. 
+*)
 Fixpoint beq_list (T : Type) (l1 l2 : list T) (comp : T -> T -> bool) := 
   match l1 with
   | nil =>
@@ -30,6 +32,23 @@ Fixpoint beq_list (T : Type) (l1 l2 : list T) (comp : T -> T -> bool) :=
 Definition beq_nat_list (l1 l2 : list nat) :=
   beq_list nat l1 l2 beq_nat.
 
+Definition beq_bool (b1 b2 : bool) :=
+  match b1 with
+  | true => b2
+  | false => negb b2
+  end.
+
+Definition beq_bool_list (l1 l2 : list bool) :=
+  beq_list bool l1 l2 beq_bool.
+
+Definition beq_list_nat_list (l1 l2 : list (list nat)) :=
+  beq_list (list nat) l1 l2 beq_nat_list.
+
+(*****)
+
+(*
+* Fold right
+*)
 Definition unit_tests_for_fold_right (candidate : forall T1 T2, T2 -> (T1 -> T2 -> T2) -> list T1 -> T2) :=
   (* Nil list always returns nil case. Cons case doesn't any influence *)
   (beq_nat (candidate nat nat 42 plus nil)
@@ -81,8 +100,10 @@ Proof.
   intros T1 T2 nil_case cons_case vs.
   
   induction vs as [ | v vs' IHvs'].
+    (* NIL CASE *)
     rewrite H_g_nil.
     apply H_f_nil.
+  (* CONS CASE *)
   rewrite H_f_cons.
   rewrite IHvs'.
   rewrite H_g_cons.
@@ -129,6 +150,11 @@ Proof.
   exact unfold_fold_right_v0_cons.
 Qed.
 
+(*****)
+
+(*
+* Fold left
+*)
 Definition unit_tests_for_fold_left (candidate : forall T1 T2, T2 -> (T1 -> T2 -> T2) -> list T1 -> T2) :=
   (* Nil list always returns nil case. Cons case doesn't any influence *)
   (beq_nat (candidate nat nat 42 plus nil)
@@ -179,14 +205,13 @@ Proof.
   intros f g [H_f_nil H_f_cons] [H_g_nil H_g_cons].
   intros T1 T2 nil_case cons_case vs.
   
-  (* Strengthen IH *)
+  (* We revert nil_case to strengthen the IH *)
   revert nil_case.
-  
-  induction vs as [ | v vs' IHvs'].
-    intro nil_case.
+  induction vs as [ | v vs' IHvs']; intro nil_case.
+    (* NIL CASE *)
     rewrite H_g_nil.
     apply H_f_nil.
-  intro nil_case.
+  (* CONS CASE *)
   rewrite H_f_cons.
   rewrite IHvs'.
   rewrite H_g_cons.
@@ -233,84 +258,65 @@ Proof.
   exact unfold_fold_left_v0_cons.
 Qed.
 
-(* propose an implementation of fold_right (resp. of fold_left)
-that satisfies the specification of fold_right (resp. of fold_left). *)
+(*****)
 
-(* Moved further down the file *)
-  
-(* show that applying [your implementation of] fold_right
-  to nil and cons gives the identity function over lists
+(*
+* We will now look into a few functions defined using fold_right and fold_left.
+*)
 
-  Example:
-    Compute
-      fold_right nat
-                 (list nat)
-                 nil
-                 (fun n ns => n :: ns)
-                 (1 :: 2 :: 3 :: nil).
-  yields
-    (1 :: 2 :: 3 :: nil) *)
-
-Definition unit_tests_for_list_nat_identiy (identity : forall T, list T -> list T) :=
+(*
+* List identity
+*)
+Definition unit_tests_for_list_identiy (identity : forall T, list T -> list T) :=
   (beq_nat_list (identity nat nil) nil)
   &&
   (beq_nat_list (identity nat (1 :: 2 :: 3 :: nil)) (1 :: 2 :: 3 :: nil))
   &&
-  (beq_nat_list (identity nat (42 :: nil)) (42 :: nil)).
+  (beq_nat_list (identity nat (42 :: nil)) (42 :: nil))
+  &&
+  (beq_bool_list (identity bool (true :: false :: nil)) (true :: false :: nil)).
 
 Definition specification_of_list_identity (identity : forall T, list T -> list T) :=
-  forall (T : Type) (xs : list T),
-    identity T xs = xs.
+  forall (T : Type) (vs : list T),
+    identity T vs = vs.
 
 Theorem there_is_only_one_list_identity :
   forall (f g : forall T, list T -> list T),
     specification_of_list_identity f ->
     specification_of_list_identity g ->
-    forall (T : Type) (xs : list T),
-      f T xs = g T xs.
+    forall (T : Type) (vs : list T),
+      f T vs = g T vs.
 Proof.
   unfold specification_of_list_identity.
-  intros f g S_i_f S_i_g T xs.
+  intros f g S_i_f S_i_g T vs.
   rewrite S_i_g.
   apply S_i_f.
 Qed.
 
-Definition list_identity_v0 (T : Type) (xs : list T) :=
-  fold_right_v0 T (list T) nil (fun n ns => n :: ns) xs.
+Definition list_identity_v0 (T : Type) (vs : list T) :=
+  fold_right_v0 T (list T) nil (fun v vs' => v :: vs') vs.
 
-Compute unit_tests_for_list_nat_identiy list_identity_v0.
+Compute unit_tests_for_list_identiy list_identity_v0.
 
 Proposition list_identity_v0_fits_the_specification_of_list_identity :
   specification_of_list_identity list_identity_v0.
 Proof.
-  unfold specification_of_list_identity.
-  unfold list_identity_v0.
-  intros T xs.
+  unfold specification_of_list_identity, list_identity_v0.
+  intros T vs.
 
-  induction xs as [ | x xs' IHxs' ].
+  induction vs as [ | v vs' IHvs' ].
     (* NIL CASE *)
     apply unfold_fold_right_v0_nil.
   (* CONS CASE *)
   rewrite unfold_fold_right_v0_cons.
-  rewrite IHxs'.
+  rewrite IHvs'.
   reflexivity.
 Qed.
 
-(* show that applying [your implementation of] fold_left
-  to nil and cons gives the reverse function over lists
-
-  Example:
-    Compute
-      fold_left nat
-                (list nat)
-                nil
-                (fun n ns => n :: ns)
-                (1 :: 2 :: 3 :: nil).
-  yields
-    (3 :: 2 :: 1 :: nil)
- *)
-
-Definition unit_tests_for_append_nat (append : forall T, list T -> list T -> list T) :=
+(*
+* Append lists
+*)
+Definition unit_tests_for_append (append : forall T, list T -> list T -> list T) :=
   (beq_nat_list (append nat nil nil)
                   nil)
   &&
@@ -321,7 +327,10 @@ Definition unit_tests_for_append_nat (append : forall T, list T -> list T -> lis
                 (4 :: nil))
   &&
   (beq_nat_list (append nat (1 :: 2 :: nil) (3 :: 4 :: nil))
-                  (1 :: 2 :: 3 :: 4 :: nil)).
+                (1 :: 2 :: 3 :: 4 :: nil))
+  &&
+  (beq_bool_list (append bool (true :: nil) (false :: nil))
+                 (true :: false :: nil)).
 
 Definition specification_of_append (append : forall T, list T -> list T -> list T) :=
   (forall (T : Type) (ys : list T),
@@ -337,36 +346,35 @@ Theorem there_is_only_one_append :
     forall (T : Type) (xs ys : list T),
       f T xs ys = g T xs ys.
 Proof.
-  intros f g [Sf_bc Sf_ic] [Sg_bc Sg_ic].
-  intros T xs.
+  intros f g [H_f_bc H_f_ic] [H_g_bc H_g_ic].
+  intros T xs ys.
 
-  induction xs as [ | x xs' IHxs' ]; intro ys.
-
-  rewrite -> Sg_bc.
-  apply Sf_bc.
-
-  rewrite -> Sf_ic.
-  rewrite -> IHxs'.
-  rewrite -> Sg_ic.
+  induction xs as [ | x xs' IHxs' ].
+    (* NIL CASE *)
+    rewrite H_g_bc.
+    apply H_f_bc.
+  (* CONS CASE *)
+  rewrite H_f_ic.
+  rewrite IHxs'.
+  rewrite H_g_ic.
   reflexivity.
 Qed.
 
 Definition append_v0 (T : Type) (xs ys : list T) :=
   fold_right_v0 T (list T) ys (fun n ns => n :: ns) xs.
 
-Compute unit_tests_for_append_nat append_v0.
+Compute unit_tests_for_append append_v0.
 
 Proposition append_v0_fits_the_specification_of_append :
   specification_of_append append_v0.
 Proof.
-  unfold specification_of_append, append_v0.
-  split.
-
-  intros T ys.
-  apply unfold_fold_right_v0_nil.
-
+  unfold specification_of_append, append_v0; split.
+    (* NIL CASE *)
+    intros T ys.
+    apply unfold_fold_right_v0_nil.
+  (* CONS CASE *)
   intros T x xs' ys.
-  rewrite -> unfold_fold_right_v0_cons.
+  rewrite unfold_fold_right_v0_cons.
   reflexivity.
 Qed.
 
@@ -843,18 +851,6 @@ Fixpoint odd (n : nat) :=
 Definition even (n : nat) :=
   negb (odd n).
 
-Definition beq_bool (b1 b2 : bool) :=
-  match b1 with
-  | true => b2
-  | false => negb b2
-  end.
-
-Definition beq_bool_list (l1 l2 : list bool) :=
-  beq_list bool l1 l2 beq_bool.
-
-Definition beq_list_nat_list (l1 l2 : list (list nat)) :=
-  beq_list (list nat) l1 l2 beq_nat_list.
-
 Definition unit_tests_for_map (candidate : forall T1 T2, (T1 -> T2) -> list T1 -> list T2) :=
   (beq_nat_list (candidate nat nat (fun x => x * 10) (1 :: 2 :: 3 :: nil))
                 (10 :: 20 :: 30 :: nil))
@@ -1191,7 +1187,7 @@ Proof.
 Qed.
 
 Definition unit_tests_for_p_r_over_polymorphic_lists 
-  (candidate : forall T : Type, list T -> (nat -> list T -> list T) -> nat -> list T) :=
+  (candidate : forall T1 T2 : Type, list T -> (nat -> list T -> list T) -> nat -> list T) :=
 (beq_nat_list (candidate nat nil (fun n ns => n :: ns) 0)
               nil)
 &&
