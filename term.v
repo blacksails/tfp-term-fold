@@ -848,12 +848,13 @@ Proof.
 Qed.
 
 (* 
-  show that if the cons case is a function that is associative and
+  We will now show that if the cons case is a function that is associative and
   commutative, applying fold_left and applying fold_right to a nil case,
-  this cons case, and a list give the same result.  Example
-  (remembering that + is the infix notation for the function plus):
-*)
+  this cons case, and a list yields the same result.  
 
+  We know that plus is associative and commutative, we will therefore start by
+  showing that it holds for plus.
+*)
 Definition specification_of_addition (add : nat -> nat -> nat) :=
   (forall j : nat,
     add O j = j)
@@ -871,8 +872,10 @@ Proof.
   intros p1 p2 [H_p1_bc H_p1_ic] [H_p2_bc H_p2_ic].
   intros x y.
   induction x as [ | x' IHx'].
+    (* ZERO CASE *)
     rewrite H_p2_bc.
     apply H_p1_bc.
+  (* SUCCESSOR CASE *)
   rewrite H_p1_ic.
   rewrite IHx'.
   rewrite H_p2_ic.
@@ -887,7 +890,7 @@ Proof.
   apply plus_Sn_m.
 Qed.
 
-Proposition about_addition_and_fold_left :
+Lemma about_addition_and_fold_left :
   forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2)
          (add : nat -> nat -> nat),
     specification_of_fold_left fold_left ->
@@ -899,22 +902,25 @@ Proof.
   intros fold_left add 
          [H_fold_left_nil H_fold_left_cons] S_add.
   intros n ns.
- 
+  
+  (* We strengthen the IH by reverting n *)
   revert n. 
   induction ns as [ | n' ns' IHns']; intro n.
+    (* NIL CASE *)
     rewrite ->2 H_fold_left_nil.
-    (* Rewrite add to plus so that we can use the coq lib's lemmas about plus *)
+    (* We rewrite add to plus so that we can use coq lib's lemmas about plus *)
     rewrite (there_is_only_one_addition 
                add
                plus
                S_add
                plus_fits_the_specification_of_addition).
     ring.
+  (* CONS CASE *)
   rewrite H_fold_left_cons.
   rewrite <- IHns'.
   rewrite H_fold_left_cons.
   rewrite <- (IHns' (add n' n)).
-  (* Rewrite add to plus so that we can use the coq lib's lemmas about plus *)
+  (* We rewrite add to plus so that we can use coq lib's lemmas about plus *)
   rewrite ->5 (there_is_only_one_addition 
                  add
                  plus
@@ -937,17 +943,13 @@ Proof.
   
   induction ns as [ | n ns' IHns'].
     (* NIL CASE *)
-    rewrite unfold_fold_right_v0_nil.
     rewrite unfold_fold_left_v0_nil.
-    reflexivity.
+    apply unfold_fold_right_v0_nil.
   (* CONS CASE *)
-  (* left hand side *)
   rewrite unfold_fold_right_v0_cons.
   rewrite IHns'.
-  (* right hand side *)
   rewrite unfold_fold_left_v0_cons.
   rewrite plus_0_r.
-
   apply (about_addition_and_fold_left
            fold_left_v0
            plus
@@ -957,12 +959,8 @@ Proof.
            ns').
 Qed.
 
-(* Wrote this too many times :o) *)
-Definition fold_type :=
-  forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2.
-
 Proposition fold_right_and_left_on_assoc_and_comm_cons_same_result_aux :
-  forall (fold_left : fold_type),
+  forall (fold_left : forall (T1 T2 : Type), T2 -> (T1 -> T2 -> T2) -> list T1 -> T2),
     specification_of_fold_left fold_left ->
     forall (T : Type)
            (func : T -> T -> T),
@@ -976,20 +974,26 @@ Proof.
   intros fold_left [H_fold_left_nil H_fold_left_cons].
   intros T func H_func_assoc H_func_comm.
   intros n n' ns'.
+ 
+  (* We strengthen the IH by reverting n *)
   revert n.
-
   induction ns' as [ | n'' ns'' IHns'']; intro n.
+    (* NIL CASE *)
     rewrite ->2 H_fold_left_nil.
     reflexivity.
+  (* CONS CASE *)
   rewrite H_fold_left_cons.
   rewrite IHns''.
   rewrite H_fold_left_cons.
-
+  (* using the assoc and comm hypothesises, we can complete the proof *)
   rewrite ->2 H_func_assoc.
   rewrite (H_func_comm n' n'').
   reflexivity.
 Qed.
 
+(*
+* Generalised version
+*)
 Proposition fold_right_and_left_on_assoc_and_comm_cons_same_result :
   forall (T : Type) (func : T -> T -> T),
     (forall n m p : T, func n (func m p) = func (func n m) p) ->
@@ -998,14 +1002,15 @@ Proposition fold_right_and_left_on_assoc_and_comm_cons_same_result :
       fold_right_v0 T T n func ns = fold_left_v0 T T n func ns.
 Proof.
   intros T func func_assoc func_comm n ns.
+
   induction ns as [ | n' ns' IHns'].
-    rewrite unfold_fold_right_v0_nil.
+    (* NIL CASE *)
     rewrite unfold_fold_left_v0_nil.
-    reflexivity.
+    apply unfold_fold_right_v0_nil.
+  (* CONS CASE *)
   rewrite unfold_fold_right_v0_cons.
   rewrite IHns'.
   rewrite unfold_fold_left_v0_cons.
-
   apply (fold_right_and_left_on_assoc_and_comm_cons_same_result_aux
            fold_left_v0
            fold_left_v0_fits_the_specification_of_fold_left
@@ -1018,6 +1023,10 @@ Proof.
            ns').
 Qed.
 
+(*
+* Instead of doing the proof with plus we can now just use the generalised
+* version.
+*)
 Proposition same_old_same_old_alternative :
   (forall n m p : nat,
      n + (m + p) = n + m + p) ->
