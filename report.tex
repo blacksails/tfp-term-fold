@@ -319,14 +319,22 @@ primitive iteration, if we just ignore that the snapshot exists.
 
 \subsubsection{Usage of the snapshot}
 This project was focused on folds, and we can easily implement folds without
-using the snapshots. Therefore the topic of the snapshots is a bit outside this
-purpose of this report, and we will not go into much detail about it. But we
-should at least mention what it \emph{could} be used for.
+using the snapshots. But in order to show some example usage of the snapshot in
+primitive recursion, we implemented a function which maps a list to the list of
+it's suffixes.
 
 The last two unit tests for primitive recursion over lists show two functions
 which make use of the snapshots. The first one returns a list of all the
 snapshots, the second returns a flattened list of snapshots. We could specify,
 and implement these functions if we were to expand on that topic.
+
+We took a step further and defined three versions of the list of suffixes
+function. Where one of these use the snapshot like the one in the unit test. The
+other two are alternative implementations. We then prove these to be equivalent.
+
+This is done by structual induction on the input list. When proving the
+equivalency with the one that uses primitive iteration, we need a master lemma.
+Apart from that the proof is straight forward.
 
 \section{Conclusion}
 In this report we looked at fold right and fold left. We saw that they share the
