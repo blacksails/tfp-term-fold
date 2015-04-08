@@ -3,6 +3,8 @@
 \usepackage{parskip} 
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{biblatex}
+\addbibresource{sources.bib}
 
 \title{Techniques in Functional Programming\\
 Term Project\\
@@ -60,7 +62,7 @@ illustrates this very well.
 \begin{figure}[h]
 \includegraphics[width=0.5\textwidth]{fold_left}
 \includegraphics[width=0.5\textwidth]{fold_right}
-\caption{Illustrations of fold left and fold right}
+\caption{Illustrations of fold left and fold right.~\cite{foldl}\cite{foldr}}
 \label{fig:folds}
 \end{figure}
 
@@ -351,5 +353,7 @@ In the end we saw that primitive iteration over lists is the exact same
 thing as fold right. Using the connection between fold right and fold left, we
 were able to define fold left in terms of primitive iteration. We also saw how
 the snapshot in primitive recursion was irrelevant in relation to folding.
+
+\printbibliography[heading=bibnumbered]{}
 
 \end{document}
