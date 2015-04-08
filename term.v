@@ -1384,3 +1384,173 @@ Proof.
   apply fold_left_from_fold_right.
   apply fold_right_v3_fits_the_specification_of_fold_right.
 Qed.
+
+(*****)
+
+(*
+* We didn't need the snapshot of the prmitive recursion in the above proofs.
+* The following is an example where we use the snapshot of primitive recursion,
+* and a proof of equivalency of three implementations of the list_of_suffixes 
+* function.
+*)
+Definition unit_tests_for_list_of_suffixes (candidate : forall (T : Type), list T -> list (list T)) :=
+  (beq_list_nat_list (candidate nat nil)
+                     nil)
+  &&
+  (beq_list_nat_list (candidate nat (1 :: nil))
+                     ((1 :: nil) :: nil))
+  &&
+  (beq_list_nat_list (candidate nat (1 :: 2 :: 3 :: nil))
+                     ((1 :: 2 :: 3 :: nil) :: (2 :: 3 :: nil) :: (3 :: nil) :: nil)).
+
+Definition list_of_suffixes_v0 (T : Type) (vs : list T) :=
+  let fix visit vs :=
+    match vs with
+    | nil => nil
+    | v :: vs' => vs :: visit vs'
+    end
+  in visit vs.
+
+Compute unit_tests_for_list_of_suffixes list_of_suffixes_v0.
+
+Definition list_of_suffixes_v1 (T : Type) (vs : list T) :=
+  p_r_over_polymorphic_lists_v0 T 
+                                (list (list T)) 
+                                nil 
+                                (fun s v vs => s :: vs)
+                                vs.
+
+Compute unit_tests_for_list_of_suffixes list_of_suffixes_v1.
+
+Definition list_of_suffixes_v2 (T : Type) (vs : list T) :=
+  match 
+    p_i_over_polymorphic_lists_v0 T 
+                                  (list T * list (list T))
+                                  (nil, nil)
+                                  (fun (v : T) (p : list T * list (list T)) => 
+                                     match p with
+                                     | (s, los_s) => (v :: s, (v :: s) :: los_s)
+                                  end)
+                                  vs
+  with
+  | (_, result) => result
+  end.
+
+Compute unit_tests_for_list_of_suffixes list_of_suffixes_v2.
+
+(* 
+* The following test hints that the three list suffixes functions are equivalent
+*)
+Compute (unit_tests_for_list_of_suffixes list_of_suffixes_v0)
+        &&
+        (unit_tests_for_list_of_suffixes list_of_suffixes_v1)
+        &&
+        (unit_tests_for_list_of_suffixes list_of_suffixes_v2).
+
+Lemma unfold_list_of_suffixes_v0_nil :
+  forall T : Type,
+    list_of_suffixes_v0 T nil = nil.
+Proof.
+  unfold_tactic list_of_suffixes_v0.
+Qed.
+
+Lemma unfold_list_of_suffixes_v0_cons :
+  forall (T : Type) (v : T) (vs' : list T),
+    list_of_suffixes_v0 T (v :: vs') = (v :: vs') :: list_of_suffixes_v0 T vs'.
+Proof.
+  unfold_tactic list_of_suffixes_v0.
+Qed.
+
+Theorem list_of_suffixes_v0_and_v1_are_equivalent :
+  forall (T : Type) (vs : list T),
+    list_of_suffixes_v0 T vs = list_of_suffixes_v1 T vs.
+Proof.
+  intros T vs.
+  unfold list_of_suffixes_v1.
+
+  induction vs as [ | v vs' IHvs'].
+    (* NIL CASE *)
+    rewrite unfold_p_r_over_polymorphic_lists_v0_nil.
+    apply unfold_list_of_suffixes_v0_nil.
+  (* CONS CASE *)
+  rewrite unfold_list_of_suffixes_v0_cons.
+  rewrite IHvs'.
+  rewrite unfold_p_r_over_polymorphic_lists_v0_cons.
+  reflexivity.
+Qed.
+
+Lemma list_of_suffixes_v2_master_lemma :
+  forall (T : Type)
+         (vs : list T),
+    p_i_over_polymorphic_lists_v0 T (list T * list (list T)) (nil, nil) (
+      fun v p => match p with
+      | (s, los_s) => (v :: s, (v :: s) :: los_s)
+      end
+    ) vs = (vs, list_of_suffixes_v2 T vs).
+Proof.
+  intros T vs.
+    unfold list_of_suffixes_v2.
+
+  induction vs as [ | v vs' IHvs'].
+    (* NIL CASE *)
+    rewrite unfold_p_i_over_polymorphic_lists_v0_nil.
+    reflexivity.
+  (* CONS CASE *)
+  rewrite unfold_p_i_over_polymorphic_lists_v0_cons.
+  rewrite IHvs'.
+  reflexivity.
+Qed.
+
+Theorem list_of_suffixes_v0_and_v2_are_equivalent :
+  forall (T : Type) (vs : list T),
+    list_of_suffixes_v0 T vs = list_of_suffixes_v2 T vs.
+Proof.
+  intros T vs.
+  unfold list_of_suffixes_v2.
+  
+  induction vs as [ | v vs' IHvs'].
+    (* NIL CASE *)
+    rewrite unfold_p_i_over_polymorphic_lists_v0_nil.
+    apply unfold_list_of_suffixes_v0_nil.
+  (* CONS CASE *)
+  rewrite unfold_list_of_suffixes_v0_cons.
+  rewrite IHvs'.
+  rewrite unfold_p_i_over_polymorphic_lists_v0_cons.
+  rewrite list_of_suffixes_v2_master_lemma.
+  reflexivity.
+Qed.
+
+Theorem list_of_suffixes_v1_and_v2_are_equivalent :
+  forall (T : Type) (vs : list T),
+    list_of_suffixes_v1 T vs = list_of_suffixes_v2 T vs.
+Proof.
+  intros T vs.
+  unfold list_of_suffixes_v1, list_of_suffixes_v2.
+
+  induction vs as [ | v vs' IHvs'].
+    (* NIL CASE *)
+    rewrite unfold_p_i_over_polymorphic_lists_v0_nil.
+    apply unfold_p_r_over_polymorphic_lists_v0_nil.
+  (* CONS CASE *)
+  rewrite unfold_p_r_over_polymorphic_lists_v0_cons.
+  rewrite IHvs'.
+  rewrite unfold_p_i_over_polymorphic_lists_v0_cons.
+  rewrite list_of_suffixes_v2_master_lemma.
+  reflexivity.
+Qed.
+
+Proposition list_of_suffixes_v0_v1_and_v2_are_equivalent :
+  forall (T : Type) (vs : list T),
+    (list_of_suffixes_v0 T vs = list_of_suffixes_v1 T vs)
+    /\
+    (list_of_suffixes_v0 T vs = list_of_suffixes_v2 T vs)
+    /\
+    (list_of_suffixes_v1 T vs = list_of_suffixes_v2 T vs).
+Proof.
+  intros T vs.
+  split.
+    apply list_of_suffixes_v0_and_v1_are_equivalent.
+  split. 
+    apply list_of_suffixes_v0_and_v2_are_equivalent.
+  apply list_of_suffixes_v1_and_v2_are_equivalent.
+Qed.
